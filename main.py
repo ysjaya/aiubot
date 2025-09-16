@@ -93,7 +93,7 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
     try:
         stream = cerebras_client.chat.completions.create(
             messages=full_context,
-            model="qwen-3-235b-a22b-thinking-2507",
+            model="qwen-3-235b-a22b-instruct-2507",
             stream=True,
             max_completion_tokens=200,
             temperature=1,
