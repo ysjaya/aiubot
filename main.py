@@ -7,7 +7,7 @@ from typing import Dict, List
 from pyrogram import Client, filters, idle
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ChatAction, ChatType
-from pyrogram.errors import UserAlreadyParticipant
+from pyrogram.errors import UserAlreadyParticipant, InputUserDeactivated, FloodWait
 
 # Mengimpor menu dari file help_menu.py
 import help_menu
@@ -93,11 +93,11 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
     try:
         stream = cerebras_client.chat.completions.create(
             messages=full_context,
-            model="qwen-3-235b-a22b-instruct-2507",
+            model="qwen-3-235b-a22b-thinking-2507",
             stream=True,
             max_completion_tokens=200,
-            temperature=0.7,
-            top_p=0.8
+            temperature=1,
+            top_p=0.5
         )
         return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
     except Exception as e:
@@ -123,11 +123,18 @@ async def process_and_reply(client: Client, message: Message):
         ai_reply = await get_ai_response(context)
         typing_indicator.cancel()
         if not ai_reply: return
+        
         message_chunks = split_text(ai_reply)
         first_chunk = message_chunks.pop(0)
-        await message.reply_text(first_chunk)
-        for chunk in message_chunks:
-            await client.send_message(message.chat.id, chunk)
+
+        try:
+            await message.reply_text(first_chunk)
+            for chunk in message_chunks:
+                await client.send_message(message.chat.id, chunk)
+        except InputUserDeactivated:
+            logging.warning(f"Tidak dapat membalas pesan di chat {message.chat.id} karena pengguna telah dinonaktifkan.")
+            return
+
     except Exception:
         if typing_indicator and not typing_indicator.done():
             typing_indicator.cancel()
@@ -165,20 +172,36 @@ async def process_missed_messages(client: Client):
 def register_handlers(client: Client):
     @client.on_message(filters.command("help", prefixes=".") & filters.me)
     async def help_command_handler(_, message: Message):
-        await message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
+        try:
+            await message.edit_text(
+                text=help_menu.main_menu_text,
+                reply_markup=help_menu.main_menu_keyboard
+            )
+        except FloodWait as e:
+            logging.warning(f"Flood wait selama {e.value} detik terdeteksi pada perintah .help.")
+            await message.edit_text(f"⏳ **Terlalu banyak permintaan!** Mencoba lagi dalam **{e.value}** detik...")
+            await asyncio.sleep(e.value)
+            await message.edit_text(
+                text=help_menu.main_menu_text,
+                reply_markup=help_menu.main_menu_keyboard
+            )
 
     @client.on_callback_query(filters.regex("^help_"))
     async def help_menu_callback(_, query: CallbackQuery):
-        data = query.data
-        if data == "help_main":
-            await query.message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
-        elif data == "help_utility":
-            await query.message.edit_text(text=help_menu.utility_menu_text, reply_markup=help_menu.back_button_keyboard)
-        elif data == "help_control":
-            await query.message.edit_text(text=help_menu.control_menu_text, reply_markup=help_menu.back_button_keyboard)
-        elif data == "help_developer":
-            await query.message.edit_text(text=help_menu.developer_menu_text, reply_markup=help_menu.back_button_keyboard)
-        await query.answer()
+        try:
+            data = query.data
+            if data == "help_main":
+                await query.message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
+            elif data == "help_utility":
+                await query.message.edit_text(text=help_menu.utility_menu_text, reply_markup=help_menu.back_button_keyboard)
+            elif data == "help_control":
+                await query.message.edit_text(text=help_menu.control_menu_text, reply_markup=help_menu.back_button_keyboard)
+            elif data == "help_developer":
+                await query.message.edit_text(text=help_menu.developer_menu_text, reply_markup=help_menu.back_button_keyboard)
+            await query.answer()
+        except FloodWait as e:
+            await query.answer(f"Terlalu banyak permintaan! Coba lagi dalam {e.value} detik.", show_alert=True)
+            logging.warning(f"Flood wait selama {e.value} detik terdeteksi pada callback query.")
 
     @client.on_message(filters.command("ping", prefixes=".") & filters.me)
     async def ping(_, message: Message):
@@ -327,5 +350,5 @@ async def main():
     await idle()
 
 if __name__ == "__main__":
-    logging.info("🚀 Memulai Bot Multi-User Cerdas (Platform V5)...")
+    logging.info("🚀 Memulai Bot Multi-User Cerdas (Platform V6)...")
     asyncio.run(main())
