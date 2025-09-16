@@ -2,56 +2,53 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Teks untuk setiap bagian menu
 main_menu_text = """
-🤖 **Bantuan Perintah Bot** 🤖
+🤖 **Help Menu, what's good!** 🤙
 
-Silakan pilih kategori di bawah ini untuk melihat daftar perintah yang tersedia.
+Yo, *basically* ini semua command yang bisa lo pake. Tinggal pilih aja mau liat apaan, biar nggak *lost in translation*.
 """
 
 utility_menu_text = """
-🛠️ **Perintah Utilitas**
+🛠️ **Utility Stuffs**
 
 `.id`
-Menampilkan ID chat, ID pengguna yang dibalas, atau ID Anda sendiri.
+Ngecek ID. *Basically*, buat *stalking* digital. LOL.
 
 `.ping`
-Cek latensi dan memastikan bot aktif.
+Cuma 'pong' doang, ngetes koneksi. *Chill*.
 
 `.help`
-Menampilkan menu bantuan interaktif ini.
+Kalo lo lupa, balik lagi ke sini. *No worries*.
 """
 
 control_menu_text = """
-⚙️ **Perintah Kontrol**
+⚙️ **Control Commands**
 
 `.start`
-Mengaktifkan fitur balas otomatis untuk akun ini.
+Nyalain auto-reply. Biar gue yang balesin, lo tinggal *chill*.
 
 `.stop`
-Menonaktifkan fitur balas otomatis untuk akun ini.
+Matiin auto-reply. *Okay, mic's back to you*.
 """
 
 developer_menu_text = """
-👨‍💻 **Perintah Khusus Developer**
+👨‍💻 **Developer's Playground**
 
 `.add <session>`
-Menambahkan userbot baru secara live tanpa restart.
-**Penting**: Penambahan ini bersifat sementara (runtime). Untuk membuatnya permanen, Anda harus menambahkan session string ke environment variable di server.
+Nambahin userbot baru *on the fly*. Tapi ini *temporary* ya, kalo mau permanen, *you know the drill*, tambahin di env.
 
 `.gcast <pesan>`
-Mengirim broadcast ke semua grup di mana bot menjadi anggota.
-**Perhatian**: Gunakan dengan bijak untuk menghindari spam.
+Broadcast ke semua grup. *Please, use it wisely*, jangan nyepam. *Not cool*.
 
 `.gucast <pesan>`
-Mengirim broadcast ke semua obrolan pribadi (user) yang ada di daftar obrolan.
-**Perhatian**: Gunakan dengan bijak untuk menghindari spam.
+Broadcast ke semua DM. *Seriously*, jangan aneh-aneh, cuy.
 """
 
 # Keyboard (Tombol) untuk setiap menu
 main_menu_keyboard = InlineKeyboardMarkup(
     [
         [
-            InlineKeyboardButton("🛠️ Utilitas", callback_data="help_utility"),
-            InlineKeyboardButton("⚙️ Kontrol", callback_data="help_control"),
+            InlineKeyboardButton("🛠️ Utility", callback_data="help_utility"),
+            InlineKeyboardButton("⚙️ Control", callback_data="help_control"),
         ],
         [
             InlineKeyboardButton("👨‍💻 Developer", callback_data="help_developer"),
@@ -62,7 +59,7 @@ main_menu_keyboard = InlineKeyboardMarkup(
 back_button_keyboard = InlineKeyboardMarkup(
     [
         [
-            InlineKeyboardButton("⬅️ Kembali ke Menu Utama", callback_data="help_main"),
+            InlineKeyboardButton("⬅️ Balik ke Menu Awal", callback_data="help_main"),
         ]
     ]
 )
