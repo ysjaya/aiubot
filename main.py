@@ -13,6 +13,9 @@ CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY")
 if not CEREBRAS_API_KEY:
     raise ValueError("CEREBRAS_API_KEY environment variable tidak ditemukan!")
 
+# ==================================================================
+# ➡️ LOGIKA YANG ANDA MAKSUD ADA DI SINI ⬇️
+# ==================================================================
 # Logika untuk membaca SESSION, SESSION2, SESSION3, dst.
 SESSION_STRINGS = []
 i = 1
@@ -23,10 +26,15 @@ while True:
         SESSION_STRINGS.append(session_str)
         i += 1
     else:
+        # Berhenti jika tidak ada lagi variabel session berurutan yang ditemukan
         break
 
 if not SESSION_STRINGS:
     raise ValueError("Tidak ada SESSION environment variable yang ditemukan! (Contoh: SESSION, SESSION2, ...)")
+# ==================================================================
+# ➡️ AKHIR DARI LOGIKA PEMBACAAN SESSION ⬆️
+# ==================================================================
+
 
 # Konstanta
 DEVELOPER_ID = {7075124863}
@@ -113,7 +121,7 @@ async def process_missed_messages(client: Client):
                     break # Ditemukan pesan terakhir dari kita, berhenti memindai lebih jauh
                 
                 # Cek apakah pesan ini adalah trigger yang valid
-                is_private_trigger = (dialog.chat.type == "private" and not msg.from_user.is_self and msg.from_user.id not in DEVELOPER_ID)
+                is_private_trigger = (dialog.chat.type == "private" and not (msg.from_user and msg.from_user.is_self) and (msg.from_user and msg.from_user.id not in DEVELOPER_ID))
                 is_group_trigger = (dialog.chat.type in ["supergroup", "group"] and (msg.mentioned or (msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_self)))
                 
                 if is_private_trigger or is_group_trigger:
@@ -152,7 +160,7 @@ def register_handlers(client: Client):
     is_mentioned_or_reply = (filters.mentioned | filters.reply)
     @client.on_message(filters.group & is_mentioned_or_reply & ~filters.me)
     async def group_reply_handler(c: Client, message: Message):
-        if isinstance(message.reply_to_message, Message) and not message.reply_to_message.from_user.is_self: return
+        if isinstance(message.reply_to_message, Message) and not (message.reply_to_message.from_user and message.reply_to_message.from_user.is_self): return
         await process_and_reply(c, message)
 
 # --- 7. Logika Utama untuk Menjalankan Semua Klien ---
