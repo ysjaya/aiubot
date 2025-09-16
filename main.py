@@ -26,7 +26,7 @@ CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY")
 if not CEREBRAS_API_KEY:
     raise ValueError("CEREBRAS_API_KEY environment variable tidak ditemukan!")
 
-LOG_GROUP_ID = -4924120899
+LOG_GROUP_ID = -1003000984762
 DEVELOPER_ID = {7075124863}
 TELEGRAM_CHAR_LIMIT = 4096
 cerebras_client = Cerebras(api_key=CEREBRAS_API_KEY)
