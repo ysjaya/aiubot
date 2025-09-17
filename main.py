@@ -7,7 +7,7 @@ from typing import Dict, List
 from pyrogram import Client, filters, idle
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ChatAction, ChatType
-from pyrogram.errors import UserAlreadyParticipant, InputUserDeactivated, FloodWait
+from pyrogram.errors import UserAlreadyParticipant, InputUserDeactivated, FloodWait, MessageNotModified
 
 # Mengimpor menu dari file help_menu.py
 import help_menu
@@ -173,25 +173,57 @@ def register_handlers(client: Client):
     @client.on_message(filters.command("help", prefixes=".") & filters.me)
     async def help_command_handler(_, message: Message):
         try:
-            await message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
+            await message.edit_text(
+                text=help_menu.main_menu_text,
+                reply_markup=help_menu.main_menu_keyboard
+            )
         except FloodWait as e:
             logging.warning(f"Kena flood wait {e.value} detik di command .help.")
-            await message.edit_text(f"⏳ **Woles, woles!** Kena *flood wait*. Coba lagi **{e.value}** detik lagi ya...")
             await asyncio.sleep(e.value)
-            await message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
+        except MessageNotModified:
+            # Ini terjadi jika menu sudah ditampilkan, abaikan saja
+            pass
+        except Exception as e:
+            logging.error(f"Error tak terduga di .help handler: {e}", exc_info=True)
+            try:
+                await message.edit_text(f"**Oops!** Terjadi error: `{e}`")
+            except Exception as edit_error:
+                logging.error(f"Gagal bahkan untuk mengedit pesan error: {edit_error}")
 
     @client.on_callback_query(filters.regex("^help_"))
     async def help_menu_callback(_, query: CallbackQuery):
         try:
             data = query.data
-            if data == "help_main": await query.message.edit_text(text=help_menu.main_menu_text, reply_markup=help_menu.main_menu_keyboard)
-            elif data == "help_utility": await query.message.edit_text(text=help_menu.utility_menu_text, reply_markup=help_menu.back_button_keyboard)
-            elif data == "help_control": await query.message.edit_text(text=help_menu.control_menu_text, reply_markup=help_menu.back_button_keyboard)
-            elif data == "help_developer": await query.message.edit_text(text=help_menu.developer_menu_text, reply_markup=help_menu.back_button_keyboard)
+            if data == "help_main":
+                await query.message.edit_text(
+                    text=help_menu.main_menu_text,
+                    reply_markup=help_menu.main_menu_keyboard
+                )
+            elif data == "help_utility":
+                await query.message.edit_text(
+                    text=help_menu.utility_menu_text,
+                    reply_markup=help_menu.back_button_keyboard
+                )
+            elif data == "help_control":
+                await query.message.edit_text(
+                    text=help_menu.control_menu_text,
+                    reply_markup=help_menu.back_button_keyboard
+                )
+            elif data == "help_developer":
+                await query.message.edit_text(
+                    text=help_menu.developer_menu_text,
+                    reply_markup=help_menu.back_button_keyboard
+                )
             await query.answer()
         except FloodWait as e:
             await query.answer(f"Kebanyakan request, beb! Coba lagi {e.value} detik.", show_alert=True)
             logging.warning(f"Kena flood wait {e.value} detik di callback query.")
+        except MessageNotModified:
+            # Jika pengguna menekan tombol yang sama berulang kali
+            await query.answer("Lo udah di menu ini, cuy.")
+        except Exception as e:
+            logging.error(f"Error tak terduga di callback handler: {e}", exc_info=True)
+            await query.answer("Waduh, ada yang error nih.", show_alert=True)
 
     @client.on_message(filters.command("ping", prefixes=".") & filters.me)
     async def ping(_, message: Message): await message.edit_text("Pong! Masih idup, santuy.")
