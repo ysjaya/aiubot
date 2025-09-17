@@ -112,7 +112,7 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
             messages=full_context,
             model="qwen-3-235b-a22b-instruct-2507",
             stream=True,
-            max_completion_tokens=200,
+            max_completion_tokens=50,
             temperature=0.75,
             top_p=0.9
         )
