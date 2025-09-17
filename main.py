@@ -112,9 +112,9 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
             messages=full_context,
             model="qwen-3-235b-a22b-instruct-2507",
             stream=True,
-            max_completion_tokens=50,
-            temperature=0.75,
-            top_p=0.9
+            max_completion_tokens=500,
+            temperature=1,
+            top_p=1
         )
         return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
     except Exception as e:
