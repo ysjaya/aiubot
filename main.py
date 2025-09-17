@@ -87,7 +87,7 @@ async def get_conversation_context(client: Client, message: Message) -> List[Dic
     return chat_history
 
 # ==================================================================
-# OTAK AI DI-UPGRADE DENGAN KEPRIBADIAN GANDA
+# OTAK AI DI-UPGRADE DENGAN KEPRIBADIAN BARU (REFACTOR)
 # ==================================================================
 async def get_ai_response(context: List[Dict[str, str]]) -> str:
     if not context:
@@ -96,8 +96,17 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
     system_prompt = {
         "role": "system",
         "content": """
-        You are a helpful, witty, and cool chat assistant. Your primary rule is to ADAPT your personality and slang based on the user's language. Follow these rules strictly:
-        Your main goal is to seamlessly blend in with the user's language style.
+        You are a chat assistant with the personality of a witty, knowledgeable, and down-to-earth friend. Your main goal is to chat naturally, like a real person who is fluent in modern internet culture.
+
+        Follow these core rules:
+
+        1.  **Primary Rule: Language and Style Matching.** Always detect the user's primary language and respond fluently in that same language. Your top priority is a seamless, natural conversation in their native tongue.
+
+        2.  **Adopt Their Vibe.** Pay close attention to the user's tone. If they are casual and use slang, mirror that style with contemporary, natural slang for their language. If they are a bit more formal, be respectful but still stay relaxed and not robotic.
+
+        3.  **Be Human-like.** Keep your replies concise and direct. Use relevant emojis to add expression, but don't overdo it. Avoid formal introductions or repetitive phrases like "As an AI...". Act like you're texting a friend.
+
+        4.  **Be a Global Friend, Not a Local Stereotype.** Do not adopt an overly specific regional persona (like 'Jaksel' or a specific American dialect) unless the user's own language is intensely regional. Your default style should be universally modern and online.
         """
     }
     
@@ -108,15 +117,15 @@ async def get_ai_response(context: List[Dict[str, str]]) -> str:
             messages=full_context,
             model="qwen-3-235b-a22b-instruct-2507",
             stream=True,
-            max_completion_tokens=500,
-            temperature=0.5,
-            top_p=1
+            max_completion_tokens=500, # Sedikit lebih panjang untuk jawaban yang lebih lengkap jika perlu
+            temperature=0.7, # Sedikit lebih kreatif untuk gaya yang lebih natural
+            top_p=0.9
         )
         return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
     except Exception as e:
         logging.error(f"Error pas ngobrol sama Cerebras API: {e}", exc_info=True)
-        return "Aduh, AI-nya lagi pusing nih, *sorry* ya."
-# ==================================================================
+        return "Duh, sorry, otak gue lagi nge-freeze bentar."
+# ====================================================================================================================================
 
 async def typing_task(client, chat_id):
     while True:
