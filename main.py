@@ -222,9 +222,13 @@ def register_handlers(client: Client):
             if not quote:
                 await message.edit_text("❌ **Gagal mengambil kutipan.** Coba lagi nanti.")
                 return
-            formatted_quote = f"✨ **Kutipan Acak** ✨\n\n{quote}"
+            
+            # --- HEADER DIUBAH DI SINI ---
+            formatted_quote = f"✨ **Quotes News** ✨\n\n{quote}"
             await message.edit_text(f"✅ **Kutipan Ditemukan!** Mengirim ke semua grup...")
+            
             count = await broadcast_to_groups(c, formatted_quote)
+            
             final_text = f"✅ **G-Cast Kutipan Acak Selesai!** Terkirim ke **{count}** grup."
             await message.edit_text(final_text)
             await send_log_notification(f"📣 **Manual G-Cast Kutipan Selesai!**\nAkun `{c.me.first_name}` telah mengirim kutipan acak.")
@@ -298,7 +302,6 @@ async def main():
             await send_log_notification(startup_message)
             asyncio.create_task(process_missed_messages(c))
         
-        # --- PERBAIKAN DI SINI ---
         client_tasks.append(start_client_tasks(client))
 
     await asyncio.gather(*client_tasks)
