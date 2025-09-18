@@ -5,34 +5,27 @@ import traceback
 from typing import Dict, List
 
 from pyrogram import Client, filters, idle
-from pyrogram.types import Message, CallbackQuery
+from pyrogram.types import Message
 from pyrogram.enums import ChatAction, ChatType
 from pyrogram.errors import (
     UserAlreadyParticipant,
     InputUserDeactivated,
     FloodWait,
-    MessageNotModified
 )
 
-# --- IMPORT BARU ---
-import help_menu
+# Impor dari file-file modul kita
+from help_menu import HELP_TEXT
 from status_handler import get_stats_handler
-from scheduler import scheduled_gcast_task
-
-from cerebras.cloud.sdk import Cerebras
+from scheduler import scheduled_gcast_task, get_random_quote, broadcast_to_groups
+import ai_brain
 
 # --- 1. Konfigurasi Logging & Konstanta ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler()])
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
-CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY")
-if not CEREBRAS_API_KEY:
-    raise ValueError("CEREBRAS_API_KEY environment variable tidak ditemukan!")
-
-LOG_GROUP_ID = -1003000984762
+LOG_GROUP_ID = -1003000984762 
 DEVELOPER_ID = {7075124863}
 TELEGRAM_CHAR_LIMIT = 4096
-cerebras_client = Cerebras(api_key=CEREBRAS_API_KEY)
 
 # --- 2. State Management (Global) ---
 auto_reply_states: Dict[int, Dict[str, bool]] = {}
@@ -52,28 +45,28 @@ def split_text(text: str) -> List[str]:
 
 async def send_log_notification(message: str, is_error: bool = False):
     if not ACTIVE_CLIENTS:
-        logging.warning("Gak ada klien aktif buat ngirim notif, cuy.")
+        logging.warning("Tidak ada klien aktif untuk mengirim notifikasi.")
         return
     notifier_client = next(iter(ACTIVE_CLIENTS.values()))
-    header = "✅ **Bot Update, nih**" if not is_error else "🛑 **OMG, ERROR ALERT**"
+    header = "✅ **Bot Update**" if not is_error else "🛑 **Bot Error**"
     full_message = f"{header}\n\n{message}"
     try:
         for chunk in split_text(full_message):
             await notifier_client.send_message(LOG_GROUP_ID, chunk)
     except Exception as e:
-        logging.error(f"Gagal ngirim notif ke grup log: {e}")
+        logging.error(f"Gagal mengirim notifikasi ke grup log: {e}")
 
 async def join_log_group(client: Client):
     try:
         await client.join_chat(LOG_GROUP_ID)
-        logging.info(f"[{client.me.first_name}] berhasil join grup log.")
+        logging.info(f"[{client.me.first_name}] berhasil bergabung ke grup log.")
     except UserAlreadyParticipant:
-        logging.info(f"[{client.me.first_name}] udah di grup log, santuy.")
+        logging.info(f"[{client.me.first_name}] sudah ada di grup log.")
     except Exception as e:
-        logging.error(f"[{client.me.first_name}] gagal join grup log: {e}")
-        await send_log_notification(f"**Warning, beb:** Akun `{client.me.first_name}` gabisa join grup log. Why? `{e}`", is_error=True)
+        logging.error(f"[{client.me.first_name}] gagal bergabung ke grup log: {e}")
+        await send_log_notification(f"**Peringatan:** Akun `{client.me.first_name}` gagal bergabung ke grup log. Error: `{e}`", is_error=True)
 
-# --- 4. Logika AI & Pemrosesan Pesan ---
+# --- 4. Logika Pemrosesan Pesan ---
 async def get_conversation_context(client: Client, message: Message) -> List[Dict[str, str]]:
     chat_history = [];
     async for msg in client.get_chat_history(message.chat.id, limit=6):
@@ -81,29 +74,6 @@ async def get_conversation_context(client: Client, message: Message) -> List[Dic
             role = "assistant" if msg.from_user and msg.from_user.is_self else "user"
             chat_history.append({"role": role, "content": msg.text})
     chat_history.reverse(); return chat_history
-
-async def get_ai_response(context: List[Dict[str, str]]) -> str:
-    if not context: return ""
-    system_prompt = {
-        "role": "system",
-        "content": """
-        You are a chat assistant with the personality of a witty, knowledgeable, and down-to-earth friend. Your main goal is to chat naturally, like a real person who is fluent in modern internet culture.
-        Follow these core rules:
-        1.  **Primary Rule: Language and Style Matching.** Always detect the user's primary language and respond fluently in that same language.
-        2.  **Adopt Their Vibe.** Pay close attention to the user's tone. If they are casual, mirror that style. If they are formal, be respectful but relaxed.
-        3.  **Be Human-like.** Keep replies concise. Use relevant emojis. Avoid formal intros like "As an AI...".
-        4.  **Be a Global Friend, Not a Local Stereotype.** Your default style should be universally modern and online.
-        """
-    }
-    full_context = [system_prompt] + context
-    try:
-        stream = cerebras_client.chat.completions.create(
-            messages=full_context, model="qwen-3-235b-a22b-instruct-2507", stream=True, max_completion_tokens=800, temperature=0.2, top_p=1
-        )
-        return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
-    except Exception as e:
-        logging.error(f"Error pas ngobrol sama Cerebras API: {e}", exc_info=True)
-        return "Duh, sorry, otak gue lagi nge-freeze bentar."
 
 async def typing_task(client, chat_id):
     while True:
@@ -119,7 +89,7 @@ async def process_and_reply(client: Client, message: Message):
     try:
         typing_indicator = asyncio.create_task(typing_task(client, message.chat.id))
         context = await get_conversation_context(client, message)
-        ai_reply = await get_ai_response(context)
+        ai_reply = await ai_brain.get_ai_chat_response(context)
         typing_indicator.cancel()
         if not ai_reply: return
         
@@ -129,17 +99,17 @@ async def process_and_reply(client: Client, message: Message):
             await message.reply_text(first_chunk)
             for chunk in message_chunks: await client.send_message(message.chat.id, chunk)
         except InputUserDeactivated:
-            logging.warning(f"Gabisa bales chat {message.chat.id}, user-nya udah deactivated.")
+            logging.warning(f"Gagal membalas pesan di {message.chat.id}, pengguna nonaktif.")
             return
     except Exception:
         if typing_indicator and not typing_indicator.done(): typing_indicator.cancel()
-        logging.error(f"Gagal proses balesan buat pesan {message.id}", exc_info=True)
+        logging.error(f"Gagal memproses balasan untuk pesan {message.id}", exc_info=True)
         error_traceback = traceback.format_exc()
         await send_log_notification(f"**Traceback Error:**\nAkun: `{client.me.first_name}`\n```\n{error_traceback}\n```", is_error=True)
 
 # --- 5. Fungsi Memproses Pesan Terlewat ---
 async def process_missed_messages(client: Client):
-    logging.info(f"[{client.me.first_name}] Cek-cek pesan yang kelewat dulu ya...")
+    logging.info(f"[{client.me.first_name}] Memeriksa pesan terlewat...")
     processed_chats = set()
     try:
         async for dialog in client.get_dialogs():
@@ -155,46 +125,30 @@ async def process_missed_messages(client: Client):
                 states = auto_reply_states.get(client.me.id, {})
                 if (dialog.chat.type == ChatType.PRIVATE and states.get('dm', True)) or \
                    (dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP] and states.get('gc', True)):
-                    logging.info(f"[{client.me.first_name}] Ada pesan belum kebaca di '{dialog.chat.title or dialog.chat.first_name}'. Gue balesin ya.")
+                    logging.info(f"[{client.me.first_name}] Menemukan pesan belum dibaca di '{dialog.chat.title or dialog.chat.first_name}'. Membalas...")
                     await process_and_reply(client, trigger_message_to_reply)
                     await asyncio.sleep(5)
             processed_chats.add(dialog.chat.id)
     except Exception:
-        logging.error(f"[{client.me.first_name}] Error pas proses pesan offline", exc_info=True)
+        logging.error(f"[{client.me.first_name}] Error saat memproses pesan offline", exc_info=True)
         error_traceback = traceback.format_exc(); await send_log_notification(f"**Error di Fitur Offline:**\nAkun: `{client.me.first_name}`\n```\n{error_traceback}\n```", is_error=True)
-    logging.info(f"[{client.me.first_name}] Oke, beres cek pesan offline.")
+    logging.info(f"[{client.me.first_name}] Selesai memeriksa pesan offline.")
 
-# --- 6. Fungsi Mendaftarkan Handlers ---
+# --- 6. Fungsi Pendaftaran Handlers ---
 def register_handlers(client: Client):
-    # --- Handler dari status_handler.py ---
     stat_handler = get_stats_handler(auto_reply_states)
     client.on_message(filters.command("stat", prefixes=".") & filters.me)(stat_handler)
     
     @client.on_message(filters.command("help", prefixes=".") & filters.me)
     async def help_command_handler(_, message: Message):
         try:
-            text, keyboard = help_menu.get_menu("main")
-            await message.edit_text(text=text, reply_markup=keyboard)
+            await message.edit_text(text=HELP_TEXT, disable_web_page_preview=True)
         except Exception as e:
             logging.error(f"Error pada .help handler: {e}", exc_info=True)
 
-    @client.on_callback_query(filters.regex("^help:"))
-    async def help_menu_callback(_, query: CallbackQuery):
-        try:
-            parts = query.data.split(":"); action = parts[1]; menu_name = action
-            if action == "back": menu_name = parts[2]
-            text, keyboard = help_menu.get_menu(menu_name)
-            await query.message.edit_text(text=text, reply_markup=keyboard)
-            await query.answer()
-        except MessageNotModified:
-            await query.answer("Anda sudah berada di menu ini.")
-        except Exception as e:
-            logging.error(f"Error pada help callback handler: {e}", exc_info=True)
-            await query.answer("❌ Terjadi kesalahan.", show_alert=True)
-
     @client.on_message(filters.command("ping", prefixes=".") & filters.me)
     async def ping(_, message: Message):
-        await message.edit_text("Pong! Masih idup, santuy.")
+        await message.edit_text("Pong!")
 
     @client.on_message(filters.command("id", prefixes=".") & filters.me)
     async def id_command(c: Client, message: Message):
@@ -209,22 +163,22 @@ def register_handlers(client: Client):
     @client.on_message(filters.command("startdm", prefixes=".") & filters.me)
     async def start_dm_command(c: Client, message: Message):
         auto_reply_states[c.me.id]['dm'] = True
-        await message.edit_text("✅ **Auto-reply DM: ON.**")
+        await message.edit_text("✅ **Auto-reply DM: ON**")
 
     @client.on_message(filters.command("stopdm", prefixes=".") & filters.me)
     async def stop_dm_command(c: Client, message: Message):
         auto_reply_states[c.me.id]['dm'] = False
-        await message.edit_text("🛑 **Auto-reply DM: OFF.**")
+        await message.edit_text("🛑 **Auto-reply DM: OFF**")
         
     @client.on_message(filters.command("startgc", prefixes=".") & filters.me)
     async def start_gc_command(c: Client, message: Message):
         auto_reply_states[c.me.id]['gc'] = True
-        await message.edit_text("✅ **Auto-reply Grup: ON.**")
+        await message.edit_text("✅ **Auto-reply Grup: ON**")
 
     @client.on_message(filters.command("stopgc", prefixes=".") & filters.me)
     async def stop_gc_command(c: Client, message: Message):
         auto_reply_states[c.me.id]['gc'] = False
-        await message.edit_text("🛑 **Auto-reply Grup: OFF.**")
+        await message.edit_text("🛑 **Auto-reply Grup: OFF**")
 
     @client.on_message(filters.private & ~filters.me & ~filters.bot & ~filters.user(list(DEVELOPER_ID)))
     async def private_reply_handler(c: Client, message: Message):
@@ -242,7 +196,7 @@ def register_handlers(client: Client):
     async def add_user_command(c: Client, message: Message):
         await message.delete();
         try: new_session_string = message.text.split(" ", 1)[1].strip()
-        except IndexError: await send_log_notification("**Perintah Gagal:** Formatnya `.add <session_string>`.", is_error=True); return
+        except IndexError: await send_log_notification("**Perintah Gagal:** Format `.add <session_string>`.", is_error=True); return
         response_msg = await c.send_message(LOG_GROUP_ID, f"Memproses user baru...")
         try:
             new_client = Client(name=f"user_{len(ACTIVE_CLIENTS)}", session_string=new_session_string)
@@ -259,6 +213,24 @@ def register_handlers(client: Client):
         except Exception as e:
             logging.error(f"Gagal menambahkan user baru: {e}", exc_info=True)
             await response_msg.edit_text(f"**Gagal menambahkan user baru.**\n\n**Error:**\n`{e}`")
+
+    @client.on_message(filters.command("quotes", prefixes=".") & filters.user(list(DEVELOPER_ID)))
+    async def quotes_gcast_command(c: Client, message: Message):
+        try:
+            await message.edit_text("🚀 **Memulai G-Cast Kutipan Acak...**")
+            quote = await get_random_quote()
+            if not quote:
+                await message.edit_text("❌ **Gagal mengambil kutipan.** Coba lagi nanti.")
+                return
+            formatted_quote = f"✨ **Kutipan Acak** ✨\n\n{quote}"
+            await message.edit_text(f"✅ **Kutipan Ditemukan!** Mengirim ke semua grup...")
+            count = await broadcast_to_groups(c, formatted_quote)
+            final_text = f"✅ **G-Cast Kutipan Acak Selesai!** Terkirim ke **{count}** grup."
+            await message.edit_text(final_text)
+            await send_log_notification(f"📣 **Manual G-Cast Kutipan Selesai!**\nAkun `{c.me.first_name}` telah mengirim kutipan acak.")
+        except Exception as e:
+            logging.error(f"Error pada perintah .quotes: {e}", exc_info=True)
+            await message.edit_text(f"❌ Terjadi kesalahan pada perintah .quotes:\n`{e}`")
 
     @client.on_message(filters.command("gcast", prefixes=".") & filters.user(list(DEVELOPER_ID)))
     async def gcast_command(c: Client, message: Message):
@@ -295,7 +267,7 @@ async def main():
         else:
             break
     if not initial_sessions:
-        raise ValueError("Gak ada SESSION env, gimana mau login?")
+        raise ValueError("Tidak ada variabel SESSION di lingkungan.")
 
     for i, session_string in enumerate(initial_sessions):
         client = Client(name=f"user_{i}", session_string=session_string)
@@ -304,10 +276,10 @@ async def main():
             await client.start()
             ACTIVE_CLIENTS[client.me.id] = client
         except Exception as e:
-            logging.critical(f"Gagal start klien ke-{i+1}. Coba cek session string-nya.", exc_info=True)
+            logging.critical(f"Gagal memulai klien ke-{i+1}. Periksa session string.", exc_info=True)
     
     if not ACTIVE_CLIENTS:
-        logging.critical("Tidak ada klien yang bisa konek. Bot berhenti.")
+        logging.critical("Tidak ada klien yang berhasil terhubung. Bot berhenti.")
         return
 
     client_tasks = []
@@ -326,14 +298,13 @@ async def main():
             await send_log_notification(startup_message)
             asyncio.create_task(process_missed_messages(c))
         
-        client_tasks.append(start_client_tasks(client))
+        client_tasks.append(start_client_tasks(c))
 
     await asyncio.gather(*client_tasks)
 
     await send_log_notification(f"**🚀 Bot Aktif!**\nTotal `{len(ACTIVE_CLIENTS)}` akun berhasil dimuat.")
-    logging.info("\n✅ Semua userbot on, siap nge-chat.")
+    logging.info("\n✅ Semua userbot aktif dan siap membalas.")
     
-    # --- MULAI TUGAS TERJADWAL ---
     asyncio.create_task(scheduled_gcast_task(ACTIVE_CLIENTS))
     
     await idle()
