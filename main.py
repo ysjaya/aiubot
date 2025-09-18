@@ -107,32 +107,35 @@ async def process_and_reply(client: Client, message: Message):
         error_traceback = traceback.format_exc()
         await send_log_notification(f"**Traceback Error:**\nAkun: `{client.me.first_name}`\n```\n{error_traceback}\n```", is_error=True)
 
-# --- 5. Fungsi Memproses Pesan Terlewat ---
+# --- 5. Fungsi Memproses Pesan Terlewat (HANYA UNTUK DM) ---
 async def process_missed_messages(client: Client):
-    logging.info(f"[{client.me.first_name}] Memeriksa pesan terlewat...")
+    logging.info(f"[{client.me.first_name}] Memeriksa pesan DM terlewat...")
     processed_chats = set()
     try:
         async for dialog in client.get_dialogs():
-            if dialog.chat.id in processed_chats or dialog.chat.type not in [ChatType.PRIVATE, ChatType.SUPERGROUP, ChatType.GROUP]: continue
+            # ---- PERUBAHAN DI SINI: Hanya proses Private Chat (DM) ----
+            if dialog.chat.id in processed_chats or dialog.chat.type != ChatType.PRIVATE:
+                continue
+
             last_message_from_us, trigger_message_to_reply = None, None
             async for msg in client.get_chat_history(dialog.chat.id, limit=20):
-                if msg.from_user and msg.from_user.is_self: last_message_from_us = msg; break
-                is_private_trigger = (dialog.chat.type == ChatType.PRIVATE and not (msg.from_user and msg.from_user.is_self) and not (msg.from_user and msg.from_user.is_bot) and (msg.from_user and msg.from_user.id not in DEVELOPER_ID))
-                is_group_trigger = (dialog.chat.type in [ChatType.SUPERGROUP, ChatType.GROUP] and (msg.mentioned or (msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_self)))
-                if is_private_trigger or is_group_trigger: trigger_message_to_reply = msg
+                if msg.from_user and msg.from_user.is_self:
+                    last_message_from_us = msg
+                    break
+                if not (msg.from_user and msg.from_user.is_self) and not (msg.from_user and msg.from_user.is_bot) and (msg.from_user and msg.from_user.id not in DEVELOPER_ID):
+                    trigger_message_to_reply = msg
             
             if trigger_message_to_reply and (last_message_from_us is None or last_message_from_us.id < trigger_message_to_reply.id):
                 states = auto_reply_states.get(client.me.id, {})
-                if (dialog.chat.type == ChatType.PRIVATE and states.get('dm', True)) or \
-                   (dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP] and states.get('gc', True)):
-                    logging.info(f"[{client.me.first_name}] Menemukan pesan belum dibaca di '{dialog.chat.title or dialog.chat.first_name}'. Membalas...")
+                if states.get('dm', False): # Cek status DM, default ke False jika tidak ada
+                    logging.info(f"[{client.me.first_name}] Menemukan DM belum dibaca dari '{dialog.chat.first_name}'. Membalas...")
                     await process_and_reply(client, trigger_message_to_reply)
                     await asyncio.sleep(5)
             processed_chats.add(dialog.chat.id)
     except Exception:
-        logging.error(f"[{client.me.first_name}] Error saat memproses pesan offline", exc_info=True)
-        error_traceback = traceback.format_exc(); await send_log_notification(f"**Error di Fitur Offline:**\nAkun: `{client.me.first_name}`\n```\n{error_traceback}\n```", is_error=True)
-    logging.info(f"[{client.me.first_name}] Selesai memeriksa pesan offline.")
+        logging.error(f"[{client.me.first_name}] Error saat memproses pesan DM offline", exc_info=True)
+        error_traceback = traceback.format_exc(); await send_log_notification(f"**Error di Fitur Offline DM:**\nAkun: `{client.me.first_name}`\n```\n{error_traceback}\n```", is_error=True)
+    logging.info(f"[{client.me.first_name}] Selesai memeriksa pesan DM offline.")
 
 # --- 6. Fungsi Pendaftaran Handlers ---
 def register_handlers(client: Client):
@@ -203,7 +206,8 @@ def register_handlers(client: Client):
             await new_client.start()
             me = new_client.me
             ACTIVE_CLIENTS[me.id] = new_client
-            auto_reply_states[me.id] = {'dm': True, 'gc': True}
+            # ---- PERUBAHAN DI SINI: Status default untuk user baru ----
+            auto_reply_states[me.id] = {'dm': False, 'gc': True}
             register_handlers(new_client)
             await join_log_group(new_client)
             asyncio.create_task(process_missed_messages(new_client))
@@ -223,7 +227,6 @@ def register_handlers(client: Client):
                 await message.edit_text("❌ **Gagal mengambil kutipan.** Coba lagi nanti.")
                 return
             
-            # --- HEADER DIUBAH DI SINI ---
             formatted_quote = f"✨ **Quotes News** ✨\n\n{quote}"
             await message.edit_text(f"✅ **Kutipan Ditemukan!** Mengirim ke semua grup...")
             
@@ -290,7 +293,8 @@ async def main():
     for client in ACTIVE_CLIENTS.values():
         me = client.me
         if me.id not in auto_reply_states:
-            auto_reply_states[me.id] = {'dm': True, 'gc': True}
+            # ---- PERUBAHAN DI SINI: Status default saat startup ----
+            auto_reply_states[me.id] = {'dm': False, 'gc': True}
         
         logging.info(f"✅ Klien {me.first_name} (@{me.username}) terhubung.")
         
