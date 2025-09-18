@@ -69,7 +69,8 @@ async def scheduled_gcast_task(active_clients: dict):
             quote = await get_random_quote()
             
             if quote:
-                formatted_quote = f"✨ **Kutipan Hari Ini** ✨\n\n{quote}"
+                # --- HEADER DIUBAH DI SINI ---
+                formatted_quote = f"✨ **Quotes News** ✨\n\n{quote}"
                 await broadcast_to_groups(primary_client, formatted_quote)
             
             logging.info("Gcast kutipan selesai. Menunggu 10 menit untuk siklus berikutnya.")
