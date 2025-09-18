@@ -298,7 +298,8 @@ async def main():
             await send_log_notification(startup_message)
             asyncio.create_task(process_missed_messages(c))
         
-        client_tasks.append(start_client_tasks(c))
+        # --- PERBAIKAN DI SINI ---
+        client_tasks.append(start_client_tasks(client))
 
     await asyncio.gather(*client_tasks)
 
