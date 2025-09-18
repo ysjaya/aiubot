@@ -2,17 +2,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 """
 Struktur Menu Bantuan (Data-Driven)
-
-MENU_DATA adalah "single source of truth" untuk semua halaman bantuan.
-Setiap kunci utama (e.g., "main", "utility") mewakili satu halaman.
-
-Struktur setiap halaman:
-- "text": Teks konten yang akan ditampilkan (mendukung Markdown).
-- "keyboard": Daftar tombol (InlineKeyboardButton) untuk halaman tersebut.
-
-Callback data menggunakan format "help:<action>:<payload>"
-- help:utility -> Menampilkan halaman 'utility'.
-- help:back:main -> Kembali ke halaman 'main'.
 """
 
 MENU_DATA = {
@@ -48,11 +37,17 @@ MENU_DATA = {
     "control": {
         "text": (
             "⚙️ **Kontrol Auto-Reply AI**\n\n"
-            "Perintah untuk mengelola perilaku auto-reply dari AI.\n\n"
-            "• `.start`\n"
-            "  Mengaktifkan fitur auto-reply. AI akan mulai membalas pesan secara otomatis.\n\n"
-            "• `.stop`\n"
-            "  Menonaktifkan fitur auto-reply. Anda kembali memegang kendali penuh."
+            "Perintah untuk mengelola perilaku auto-reply secara terpisah untuk DM dan Grup.\n\n"
+            "**Kontrol DM (Pesan Pribadi):**\n"
+            "• `.startdm`\n"
+            "  Mengaktifkan auto-reply di semua DM.\n\n"
+            "• `.stopdm`\n"
+            "  Menonaktifkan auto-reply di semua DM.\n\n"
+            "**Kontrol Grup:**\n"
+            "• `.startgc`\n"
+            "  Mengaktifkan auto-reply di semua grup (saat di-mention/reply).\n\n"
+            "• `.stopgc`\n"
+            "  Menonaktifkan auto-reply di semua grup."
         ),
         "keyboard": [[InlineKeyboardButton("⬅️ Kembali", callback_data="help:back:main")]],
     },
@@ -61,7 +56,7 @@ MENU_DATA = {
             "👨‍💻 **Perintah Khusus Developer**\n\n"
             "Fitur lanjutan yang ditujukan untuk developer. Gunakan dengan hati-hati.\n\n"
             "• `.add <session>`\n"
-            "  Menambahkan userbot baru secara dinamis (bersifat sementara hingga bot di-restart).\n\n"
+            "  Menambahkan userbot baru secara langsung dengan session string (temporer).\n\n"
             "• `.gcast <pesan>`\n"
             "  Mengirim pesan broadcast ke semua grup yang Anda ikuti.\n\n"
             "• `.gucast <pesan>`\n"
@@ -74,17 +69,8 @@ MENU_DATA = {
 def get_menu(name: str):
     """
     Mengambil teks dan markup keyboard untuk nama menu yang diberikan.
-    
-    Args:
-        name (str): Kunci dari menu yang diinginkan (e.g., "main", "utility").
-        
-    Returns:
-        Tuple[str, InlineKeyboardMarkup]: Teks menu dan objek keyboard.
     """
-    # Jika nama menu tidak ditemukan, kembali ke menu "main" sebagai default
     data = MENU_DATA.get(name, MENU_DATA["main"])
-    
     text = data["text"]
     keyboard = InlineKeyboardMarkup(data["keyboard"])
-    
     return text, keyboard
