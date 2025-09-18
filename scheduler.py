@@ -74,7 +74,7 @@ async def scheduled_gcast_task(active_clients: dict):
                 await broadcast_to_groups(primary_client, formatted_quote)
             
             logging.info("Gcast kutipan selesai. Menunggu 10 menit untuk siklus berikutnya.")
-            await asyncio.sleep(600)
+            await asyncio.sleep(1800)
 
         except asyncio.CancelledError:
             logging.info("Tugas gcast terjadwal dihentikan.")
