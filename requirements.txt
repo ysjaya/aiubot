@@ -1,3 +1,4 @@
+httpx
 pyrogram
 TgCrypto
 cerebras-cloud-sdk
