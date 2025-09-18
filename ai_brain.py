@@ -1,16 +1,17 @@
 import os
 import logging
+import random # <-- Tambahkan import ini
 from typing import Dict, List
 from cerebras.cloud.sdk import Cerebras
 
-# --- Inisialisasi Klien AI di sini ---
+# Inisialisasi Klien AI di sini
 CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY")
 if not CEREBRAS_API_KEY:
     raise ValueError("AI_BRAIN: CEREBRAS_API_KEY environment variable tidak ditemukan!")
 
 cerebras_client = Cerebras(api_key=CEREBRAS_API_KEY)
 
-# --- Fungsi untuk Chat Biasa (dipindahkan dari main.py) ---
+# Fungsi untuk Chat Biasa
 async def get_ai_chat_response(context: List[Dict[str, str]]) -> str:
     """Menghasilkan balasan AI berdasarkan konteks percakapan."""
     if not context:
@@ -38,14 +39,18 @@ async def get_ai_chat_response(context: List[Dict[str, str]]) -> str:
         logging.error(f"AI_BRAIN (chat): Error saat menghubungi Cerebras API: {e}", exc_info=True)
         return "Duh, sorry, otak gue lagi nge-freeze bentar."
 
-# --- Fungsi Baru untuk Membuat Kutipan (untuk scheduler.py) ---
+# --- FUNGSI KUTIPAN DIPERBARUI DENGAN TEMA ACAK ---
 async def generate_ai_quote() -> str:
-    """Meminta AI untuk membuat kutipan inspiratif sebagai fallback."""
+    """Meminta AI untuk membuat kutipan inspiratif sebagai fallback dengan tema acak."""
     logging.info("AI_BRAIN (quote): Menghasilkan kutipan menggunakan AI...")
+    
+    # Daftar tema untuk membuat prompt lebih bervariasi
+    themes = ["kehidupan", "perjuangan", "kesuksesan", "kebijaksanaan", "harapan", "cinta", "persahabatan"]
+    selected_theme = random.choice(themes)
     
     prompt = {
         "role": "user",
-        "content": "Create a short, insightful, and original quote about life, perseverance, relationships, love, romance, memories of adolescence, or wisdom. The quote should be in Indonesian. End it with '— AI' as the author. Just provide the quote, nothing else."
+        "content": f"Create a short, insightful, and original quote about {selected_theme}. The quote should be in Indonesian. End it with '— AI' as the author. Just provide the quote, nothing else."
     }
 
     try:
@@ -53,7 +58,6 @@ async def generate_ai_quote() -> str:
             messages=[prompt], model="qwen-3-235b-a22b-instruct-2507", max_completion_tokens=1000, temperature=0.85
         )
         quote = response.choices[0].message.content.strip()
-        # Membersihkan jika ada teks tambahan yang tidak diinginkan
         if '"' in quote:
             quote = quote.replace('"', '')
         return quote
