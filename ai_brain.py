@@ -52,7 +52,7 @@ async def generate_ai_quote() -> str:
     
     prompt = {
         "role": "user",
-        "content": f"Buat satu kutipan yang sangat singkat, padat, dan inspiratif tentang {selected_theme} dalam Bahasa Indonesia. Maksimal 15 kata. Akhiri dengan '— AI'. Hanya berikan kutipannya saja."
+        "content": f"Buat satu kutipan yang sangat singkat, padat, dan inspiratif tentang {selected_theme} dalam Bahasa Indonesia. Maksimal 30 kata. Akhiri dengan '— Aal'. Hanya berikan kutipannya saja."
     }
 
     try:
@@ -66,8 +66,8 @@ async def generate_ai_quote() -> str:
         if quote.startswith('"') and quote.endswith('"'):
             quote = quote[1:-1]
         
-        if '— AI' not in quote:
-            return f'"{quote}"\n— AI'
+        if '— Aal' not in quote:
+            return f'"{quote}"\n— Aal'
         
         return quote
     except Exception as e:
