@@ -102,7 +102,7 @@ def get_image_generation_handler():
     async def generate_image_command(client: Client, message: Message):
         """Handler untuk perintah.buat <prompt>."""
         try:
-            prompt = message.text.split(" ", 1).[1]strip()
+            prompt = message.text.split(" ", 1)[1]strip()
         except IndexError:
             await message.edit_text("❌ **Format Salah.**\nGunakan: `.buat <deskripsi gambar>`")
             return
