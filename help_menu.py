@@ -6,6 +6,13 @@ HELP_TEXT = """
 Berikut adalah semua perintah yang bisa Anda gunakan.
 
 ---
+**🎨 Pembuatan Gambar AI**
+---
+• `.buat <deskripsi>`
+  Membuat gambar berdasarkan deskripsi teks Anda.
+  *Contoh: .buat a majestic lion in a neon city*
+
+---
 **🛠️ Utilitas**
 ---
 • `.id`
