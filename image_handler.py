@@ -1,10 +1,8 @@
-# image_handler.py
 import os
 import io
 import asyncio
 import logging
 import httpx
-import time
 
 from pyrogram import Client
 from pyrogram.types import Message
@@ -47,6 +45,7 @@ async def generate_image_from_prompt(prompt: str, status_msg: Message) -> bytes 
     async with httpx.AsyncClient() as client:
         try:
             # --- Langkah 1: Kirim permintaan untuk memulai pembuatan gambar ---
+            await status_msg.edit_text("⏳ `Memulai permintaan ke Replicate API...`")
             start_response = await client.post(REPLICATE_API_URL, headers=headers, json=start_payload, timeout=30)
             start_response.raise_for_status()
             start_data = start_response.json()
@@ -68,7 +67,8 @@ async def generate_image_from_prompt(prompt: str, status_msg: Message) -> bytes 
                 
                 status = status_check_data.get('status')
                 if status == 'succeeded':
-                    final_output_url = status_check_data.get('output')
+                    # Hasilnya adalah sebuah list URL, ambil URL pertama
+                    final_output_url = status_check_data.get('output', [None])[0]
                     break
                 elif status == 'failed':
                     error_detail = status_check_data.get('error')
@@ -82,8 +82,8 @@ async def generate_image_from_prompt(prompt: str, status_msg: Message) -> bytes 
                 return None
 
             # --- Langkah 3: Unduh gambar dari URL hasil ---
-            image_url = final_output_url # Hasilnya adalah sebuah list, ambil URL pertama
-            image_response = await client.get(image_url, timeout=60)
+            await status_msg.edit_text("🖼️ `Gambar selesai! Mengunduh hasil...`")
+            image_response = await client.get(final_output_url, timeout=60)
             image_response.raise_for_status()
             return image_response.content
 
@@ -97,17 +97,20 @@ async def generate_image_from_prompt(prompt: str, status_msg: Message) -> bytes 
             return None
 
 def get_image_generation_handler():
-    """Membuat dan mengembalikan fungsi handler untuk perintah.buat."""
+    """Membuat dan mengembalikan fungsi handler untuk perintah .buat."""
     
     async def generate_image_command(client: Client, message: Message):
-        """Handler untuk perintah.buat <prompt>."""
+        """Handler untuk perintah .buat <prompt>."""
         try:
-            prompt = message.text.split(" ", 1)[1]strip()
+            # --- FIX DI SINI ---
+            prompt = message.text.split(" ", 1)[1].strip()
         except IndexError:
-            await message.edit_text("❌ **Format Salah.**\nGunakan: `.buat <deskripsi gambar>`")
+            await message.reply_text("❌ **Format Salah.**\nGunakan: `.buat <deskripsi gambar>`")
+            # Menggunakan reply_text karena message mungkin sudah tidak bisa diedit jika formatnya salah
             return
 
-        status_msg = await message.edit_text("⏳ `Memulai proses dengan model Nastia...`")
+        # Menggunakan reply untuk membuat pesan status baru, bukan mengedit pesan perintah
+        status_msg = await message.reply_text("⏳ `Memulai proses dengan model Nastia...`")
         
         await client.send_chat_action(message.chat.id, ChatAction.UPLOAD_PHOTO)
 
@@ -125,6 +128,6 @@ def get_image_generation_handler():
                 await status_msg.delete()
             except Exception as e:
                 await status_msg.edit_text(f"❌ **Gagal mengirim gambar:** `{e}`")
-        # Pesan error sudah ditangani di dalam fungsi generate_image_from_prompt
+        # Pesan error sudah ditangani dan diedit di status_msg di dalam fungsi generate_image_from_prompt
 
     return generate_image_command
