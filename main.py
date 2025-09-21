@@ -1,3 +1,4 @@
+# main.py
 import os
 import asyncio
 import logging
@@ -18,6 +19,7 @@ from help_menu import HELP_TEXT
 from status_handler import get_stats_handler
 from scheduler import scheduled_gcast_task, get_random_quote, broadcast_to_groups
 import ai_brain
+from image_handler import get_image_generation_handler # <-- Impor baru
 
 # --- 1. Konfigurasi Logging & Konstanta ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler()])
@@ -113,7 +115,6 @@ async def process_missed_messages(client: Client):
     processed_chats = set()
     try:
         async for dialog in client.get_dialogs():
-            # ---- PERUBAHAN DI SINI: Hanya proses Private Chat (DM) ----
             if dialog.chat.id in processed_chats or dialog.chat.type != ChatType.PRIVATE:
                 continue
 
@@ -127,7 +128,7 @@ async def process_missed_messages(client: Client):
             
             if trigger_message_to_reply and (last_message_from_us is None or last_message_from_us.id < trigger_message_to_reply.id):
                 states = auto_reply_states.get(client.me.id, {})
-                if states.get('dm', False): # Cek status DM, default ke False jika tidak ada
+                if states.get('dm', False):
                     logging.info(f"[{client.me.first_name}] Menemukan DM belum dibaca dari '{dialog.chat.first_name}'. Membalas...")
                     await process_and_reply(client, trigger_message_to_reply)
                     await asyncio.sleep(5)
@@ -142,6 +143,10 @@ def register_handlers(client: Client):
     stat_handler = get_stats_handler(auto_reply_states)
     client.on_message(filters.command("stat", prefixes=".") & filters.me)(stat_handler)
     
+    # Handler untuk perintah .buat
+    image_gen_handler = get_image_generation_handler()
+    client.on_message(filters.command("buat", prefixes=".") & filters.me)(image_gen_handler)
+
     @client.on_message(filters.command("help", prefixes=".") & filters.me)
     async def help_command_handler(_, message: Message):
         try:
@@ -206,7 +211,6 @@ def register_handlers(client: Client):
             await new_client.start()
             me = new_client.me
             ACTIVE_CLIENTS[me.id] = new_client
-            # ---- PERUBAHAN DI SINI: Status default untuk user baru ----
             auto_reply_states[me.id] = {'dm': False, 'gc': True}
             register_handlers(new_client)
             await join_log_group(new_client)
@@ -293,7 +297,6 @@ async def main():
     for client in ACTIVE_CLIENTS.values():
         me = client.me
         if me.id not in auto_reply_states:
-            # ---- PERUBAHAN DI SINI: Status default saat startup ----
             auto_reply_states[me.id] = {'dm': False, 'gc': True}
         
         logging.info(f"✅ Klien {me.first_name} (@{me.username}) terhubung.")
