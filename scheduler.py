@@ -74,8 +74,8 @@ async def scheduled_gcast_task(active_clients: dict):
             if quote:
                 # --- FOOTER PROMOSI DITAMBAHKAN DI SINI ---
                 promo_footer = (
-                    "Free Rp Multi-Character Chatbot or make Your own character @imgplaybot\n"
-                    "Free Ai Chatbot With many capabilities such as: helping you with your assignments, chatting with friends, creating codes and so on, try @elievebot for free."
+                    "Free Rp Multi-Character Chatbot or make Your own character @imgplaybot\n\n"
+                    "Free Ai Chatbot With many capabilities such as: helping you with your assignments, chatting as friends, creating codes and so on, try @elievebot for free."
                 )
                 
                 # Menggabungkan header, kutipan, dan footer promosi
