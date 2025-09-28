@@ -1,9 +1,10 @@
 import os
-# Add these two lines to load the .env file
 from dotenv import load_dotenv
 load_dotenv()
 
+# Impor FileResponse untuk menyajikan file
 from fastapi import FastAPI, WebSocket, Depends, Query
+from fastapi.responses import FileResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 from db import get_session, init_db
@@ -15,6 +16,20 @@ from api import router as api_router
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(api_router)
+
+# === TAMBAHKAN DUA ENDPOINT DI BAWAH INI ===
+
+# 1. Endpoint untuk menyajikan index.html di path root ("/")
+@app.get("/")
+async def read_index():
+    return FileResponse('index.html')
+
+# 2. Endpoint untuk menyajikan style.css
+@app.get("/style.css")
+async def read_css():
+    return FileResponse('style.css')
+    
+# ============================================
 
 @app.on_event("startup")
 def on_startup():
