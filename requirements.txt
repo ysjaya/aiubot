@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+cerebras-cloud
+PyGithub
+requests
+beautifulsoup4
+sqlmodel
+psycopg2-binary
+python-dotenv
