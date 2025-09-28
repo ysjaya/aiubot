@@ -1,4 +1,8 @@
 import os
+# Add these two lines to load the .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, WebSocket, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
