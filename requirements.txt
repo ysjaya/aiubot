@@ -3,8 +3,14 @@ uvicorn[standard]
 cerebras-cloud-sdk
 PyGithub
 requests
-beautifulsoup4
 sqlmodel
 psycopg2-binary
 python-dotenv
 pydantic-settings
+
+# --- Dependensi Baru untuk RAG ---
+beautifulsoup4
+trafilatura
+sentence-transformers
+faiss-cpu
+numpy
