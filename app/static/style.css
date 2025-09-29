@@ -12,7 +12,7 @@
 }
 
 html, body {
-    height: 100vh;
+    height: 100dvh; /* Gunakan dvh untuk mobile */
     overflow: hidden;
     color: var(--text-color);
     background-color: var(--main-bg);
@@ -99,7 +99,7 @@ html, body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     min-width: 0;
 }
 
@@ -138,11 +138,37 @@ html, body {
 .code-toolbar button:hover { background-color: var(--accent-color); color: white; }
 
 /* --- Chat Input Area --- */
-#chat-input-area { padding: 1rem 2rem; border-top: 1px solid var(--border-color); background-color: var(--sidebar-bg); }
+#chat-input-area { 
+    padding: 1rem 2rem; 
+    border-top: 1px solid var(--border-color); 
+    background-color: var(--sidebar-bg);
+    flex-shrink: 0; /* Mencegah area input menyusut */
+}
 #status-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; height: 20px; }
-.input-wrapper { position: relative; display: flex; align-items: center; }
-#user-input { width: 100%; border-radius: var(--pico-border-radius); background-color: var(--input-bg); border-color: var(--border-color); resize: none; padding: 0.75rem 3rem 0.75rem 1rem; max-height: 200px; overflow-y: auto; }
-#send-btn { position: absolute; right: 0.5rem; }
+
+/* --- PERBAIKAN DI SINI --- */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: flex-end; /* Tombol akan menempel di bawah */
+}
+#user-input { 
+    width: 100%; 
+    border-radius: var(--pico-border-radius); 
+    background-color: var(--input-bg); 
+    border-color: var(--border-color); 
+    resize: none; 
+    padding: 0.75rem 3.5rem 0.75rem 1rem; /* Beri ruang lebih di kanan */
+    max-height: 200px; 
+    overflow-y: auto; 
+}
+#send-btn { 
+    position: absolute; 
+    right: 0.5rem; 
+    bottom: 0.5rem; /* Menempel 0.5rem dari bawah wrapper */
+}
+/* --- AKHIR PERBAIKAN --- */
+
 
 /* --- Spinner --- */
 .spinner { border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
@@ -183,4 +209,4 @@ html, body {
         background-color: var(--sidebar-bg);
     }
     .mobile-title { font-weight: bold; }
-}
+    }
