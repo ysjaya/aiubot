@@ -1,6 +1,5 @@
 fastapi
 uvicorn[standard]
-cerebras-cloud-sdk
 openai
 sqlmodel
 psycopg2-binary
@@ -11,3 +10,5 @@ requests
 beautifulsoup4
 trafilatura
 numpy
+python-multipart
+python-jose[cryptography]
