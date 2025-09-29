@@ -12,7 +12,7 @@
 }
 
 html, body {
-    height: 100dvh; /* Gunakan dvh untuk mobile */
+    height: 100dvh;
     overflow: hidden;
     color: var(--text-color);
     background-color: var(--main-bg);
@@ -145,32 +145,33 @@ html, body {
     background-color: var(--sidebar-bg);
     flex-shrink: 0;
 }
-#status-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; height: 20px; }
-
-/* --- PERUBAHAN DI SINI --- */
-.input-wrapper {
-    position: relative; /* Jadi wadah untuk tombol absolute */
+#chat-form {
+    display: flex;
+    flex-direction: column;
 }
-
+.input-wrapper {
+    position: relative;
+}
 #user-input { 
-    width: 100%; /* Ambil lebar penuh */
+    width: 100%; 
     border-radius: var(--pico-border-radius); 
     background-color: var(--input-bg); 
     border-color: var(--border-color); 
     resize: none; 
-    padding: 0.75rem 3.5rem 0.75rem 1rem; /* Beri ruang KOSONG di kanan untuk tombol */
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
     max-height: 200px; 
     overflow-y: auto; 
 }
-
-#send-btn { 
-    position: absolute; /* Tombol keluar dari alur normal */
-    right: 0.5rem;      /* Posisi 0.5rem dari kanan wrapper */
-    bottom: 0.5rem;     /* Posisi 0.5rem dari bawah wrapper */
+.submit-button {
+    align-self: flex-end;
+    width: auto;
+    padding: 0.5rem 1.5rem;
+    font-weight: bold;
 }
-/* --- AKHIR PERUBAHAN --- */
 
-/* --- Spinner --- */
+#status-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; height: 20px; }
+
 .spinner { border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -179,6 +180,37 @@ html, body {
 #toast.show { opacity: 1; bottom: 30px; }
 #toast.success { background-color: var(--success-color); }
 #toast.error { background-color: var(--error-color); }
+
+/* --- Modal --- */
+dialog {
+    width: 80%;
+    max-width: 600px;
+    border: 1px solid var(--border-color);
+    background-color: var(--sidebar-bg);
+    color: var(--text-color);
+}
+.modal-content {
+    min-height: 300px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+.github-repo-list, .github-file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.github-repo-list-item, .github-file-list-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.github-repo-list-item:hover, .github-file-list-item:hover {
+    background-color: var(--card-bg);
+}
+.github-repo-list-item:last-child, .github-file-list-item:last-child {
+    border-bottom: none;
+}
 
 .hidden { display: none !important; }
 
@@ -209,22 +241,4 @@ html, body {
         background-color: var(--sidebar-bg);
     }
     .mobile-title { font-weight: bold; }
-}
-    #sidebar-left  { transform:translateX(-100%); }
-    #sidebar-right { right:0; transform:translateX(100%); }
-    #sidebar-left.open,
-    #sidebar-right.open { transform:translateX(0); }
-
-    #chat-window,
-    #chat-input-area { padding:1rem; }
-
-    #mobile-header {
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        padding:.5rem 1rem;
-        border-bottom:1px solid var(--border-color);
-        background-color:var(--sidebar-bg);
     }
-    .mobile-title { font-weight:bold; }
-}
