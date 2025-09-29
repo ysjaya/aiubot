@@ -16,7 +16,6 @@ app = FastAPI(title="Personal AI Assistant")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # --- API Router untuk Tools ---
-# Pindahkan semua endpoint tools ke sini agar konsisten di bawah /api
 tools_router = APIRouter()
 
 @tools_router.get("/github/files")
@@ -53,9 +52,20 @@ async def read_index():
 @app.websocket("/ws/ai")
 async def ws_ai(ws: WebSocket, project_id: int = Query(...), conversation_id: int = Query(...)):
     await ws.accept()
-    data = await ws.receive_json()
-    messages = [{"role": "user", "content": data["msg"]}]
-    
-    with next(get_session()) as session:
-        async for chunk in cerebras_chain.ai_chain_stream(messages, project_id, conversation_id, session):
-            await ws.send_text(chunk)
+    print(f"\n[DEBUG] WebSocket connection accepted for project:{project_id}, conv:{conversation_id}") # LOG 1
+    try:
+        data = await ws.receive_json()
+        print(f"[DEBUG] Received message from client: {data}") # LOG 2
+        messages = [{"role": "user", "content": data["msg"]}]
+        
+        with next(get_session()) as session:
+            print("[DEBUG] Starting AI chain stream...") # LOG 3
+            async for chunk in cerebras_chain.ai_chain_stream(messages, project_id, conversation_id, session):
+                await ws.send_text(chunk)
+            print("[DEBUG] AI chain stream finished.") # LOG 4
+    except Exception as e:
+        print(f"[!!!!] ERROR in WebSocket endpoint: {e}") # LOG ERROR
+        # Optionally send an error message back to the client
+        await ws.send_text(json.dumps({"status": "error", "message": f"Server error: {e}"}))
+    finally:
+        print("[DEBUG] WebSocket connection closed.") # LOG 5
