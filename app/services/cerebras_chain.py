@@ -72,10 +72,9 @@ async def retrieve_web_context(query: str):
     all_text = []
     for url in urls:
         try:
-            downloaded = trafilatura.fetch_url(url)
-            text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
-            if text:
-                all_text.append(f"Source: {url}\n\n{text}")
+            content = web_tools.scrape_url(url)
+            if content and content['text']:
+                all_text.append(f"Source: {url}\n\n{content['text']}")
         except Exception as e:
             print(f"[AI CHAIN LOG] -> Gagal scrape URL {url}: {e}")
     
@@ -123,7 +122,8 @@ async def ai_chain_stream(messages, project_id, conv_id, session: Session):
         yield json.dumps({"status": "update", "message": "5/7 Melakukan self-critique (Cerebras)..."})
         print("[AI CHAIN LOG] TAHAP 5: Melakukan self-critique...")
         critique_prompt = PROMPT_CRITIQUE.format(DRAFT=draft_answer)
-        refined_answer = await call_cerebras([{"role": "user", "content": critique_prompt}], "llama-3.3-70b-instruct")
+        # [PERUBAHAN] Menggunakan model qwen-instruct sesuai permintaan
+        refined_answer = await call_cerebras([{"role": "user", "content": critique_prompt}], "qwen-3-235b-a22b-instruct-2507")
         print("[AI CHAIN LOG] -> Draf telah disempurnakan.")
 
         # TAHAP 6: Aggregator / Finalizer - MENGGUNAKAN CEREBRAS
@@ -131,7 +131,8 @@ async def ai_chain_stream(messages, project_id, conv_id, session: Session):
         print("[AI CHAIN LOG] TAHAP 6: Menyusun jawaban final...")
         finalize_prompt = PROMPT_FINALIZE.format(DRAFT=refined_answer, CODE=generated_code)
         
-        final_stream = stream_cerebras([{"role": "user", "content": finalize_prompt}], "llama-4-maverick")
+        # [PERUBAHAN] Menggunakan model llama-4-maverick sesuai permintaan
+        final_stream = stream_cerebras([{"role": "user", "content": finalize_prompt}], "llama-4-maverick-17b-128e-instruct")
         
         full_response = ""
         for chunk in final_stream:
