@@ -1,9 +1,9 @@
 # Gunakan base image yang lebih spesifik untuk stabilitas
 FROM python:3.11.9-slim-bullseye
 
-# Set environment variables untuk mencegah pembuatan file .pyc dan buffering output
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Set environment variables (Format diperbaiki dengan '=')
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Install build-essential untuk beberapa paket yang mungkin memerlukan kompilasi
 RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
