@@ -1,3 +1,4 @@
+--index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn[standard]
 cerebras-cloud-sdk
@@ -8,9 +9,12 @@ psycopg2-binary
 python-dotenv
 pydantic-settings
 
-# --- Dependensi Baru untuk RAG ---
+# Tools
 beautifulsoup4
 trafilatura
+
+# Dependensi RAG (dengan Torch CPU)
+torch
 sentence-transformers
 faiss-cpu
 numpy
