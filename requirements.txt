@@ -1,7 +1,7 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn[standard]
 cerebras-cloud-sdk
+openai
 sqlmodel
 psycopg2-binary
 python-dotenv
@@ -10,7 +10,4 @@ PyGithub
 requests
 beautifulsoup4
 trafilatura
-torch
-sentence-transformers
-faiss-cpu
 numpy
