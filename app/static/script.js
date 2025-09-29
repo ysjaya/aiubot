@@ -17,11 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     const chatMessages = document.getElementById('chat-messages');
     const welcomeMessage = document.getElementById('welcome-message');
+    const webQueryInput = document.getElementById('web-query');
+    const webSearchBtn = document.getElementById('web-search-btn');
+    const importGithubBtn = document.getElementById('import-github-btn');
 
     // --- API HELPERS ---
     const api = {
         get: (url) => fetch(`/api${url}`).then(res => res.json()),
-        post: (url, data) => fetch(`/api${url}`, {
+        post: (url, data = {}) => fetch(`/api${url}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -165,13 +168,85 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     };
 
-    // --- DATA FETCHING & ACTIONS ---
-    const loadProjects = async () => { /* ... sama seperti sebelumnya ... */ };
-    const loadConversations = async () => { /* ... sama seperti sebelumnya ... */ };
-    const handleNewProject = async () => { /* ... sama seperti sebelumnya ... */ };
-    const handleNewConversation = async () => { /* ... sama seperti sebelumnya ... */ };
-    const handleDeleteProject = async (projectId) => { /* ... sama seperti sebelumnya ... */ };
-    const handleDeleteConversation = async (convId) => { /* ... sama seperti sebelumnya ... */ };
+    // --- IMPLEMENTASI FUNGSI API ---
+    const loadProjects = async () => {
+        state.projects = await api.get('/projects');
+        renderProjects();
+    };
+
+    const loadConversations = async () => {
+        if (!state.currentProjectId) return;
+        state.conversations = await api.get(`/project/${state.currentProjectId}/conversations`);
+        renderConversations();
+    };
+
+    const handleNewProject = async () => {
+        const name = prompt("Enter new project name:");
+        if (name) {
+            await api.post(`/project?name=${encodeURIComponent(name)}`);
+            await loadProjects();
+        }
+    };
+
+    const handleNewConversation = async () => {
+        if (!state.currentProjectId) return;
+        const title = prompt("Enter new conversation title:", "New Chat");
+        if (title) {
+            await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title)}`);
+            await loadConversations();
+        }
+    };
+
+    const handleDeleteProject = async (projectId) => {
+        if (confirm("Are you sure you want to delete this project?")) {
+            await api.delete(`/project/${projectId}`);
+            if (state.currentProjectId === projectId) {
+                state.currentProjectId = null;
+                state.currentConvId = null;
+                chatMessages.classList.add('hidden');
+                welcomeMessage.classList.remove('hidden');
+            }
+            await loadProjects();
+            renderConversations();
+        }
+    };
+
+    const handleDeleteConversation = async (convId) => {
+        if (confirm("Are you sure you want to delete this conversation?")) {
+            await api.delete(`/conversation/${convId}`);
+            if (state.currentConvId === convId) {
+                state.currentConvId = null;
+                chatMessages.classList.add('hidden');
+                welcomeMessage.classList.remove('hidden');
+            }
+            await loadConversations();
+        }
+    };
+
+    const handleWebSearch = async () => {
+        const query = webQueryInput.value.trim();
+        if (!query) return;
+        
+        appendMessage('user', `Searching web for: "${query}"`);
+        const results = await api.get(`/websearch?q=${encodeURIComponent(query)}`);
+        
+        let content = `**Search Results for "${query}"**\n\n`;
+        if (results.results && results.results.length > 0) {
+            results.results.forEach(res => {
+                content += `- **[${res.title}](${res.url})**: ${res.snippet}\n`;
+            });
+        } else {
+            content += "No results found.";
+        }
+        appendMessage('ai', content);
+        webQueryInput.value = '';
+    };
+
+    const handleGitHubImport = () => {
+        alert("GitHub import feature is not yet implemented.");
+        // Logika untuk import dari GitHub akan ditambahkan di sini
+    };
+
 
     // --- WEBSOCKET LOGIC ---
     const setupWebSocket = () => {
@@ -270,6 +345,12 @@ document.addEventListener('DOMContentLoaded', () => {
             renderChats(chats);
         }
     });
+    
+    // --- EVENT LISTENERS BARU ---
+    newProjectBtn.addEventListener('click', handleNewProject);
+    newConvBtn.addEventListener('click', handleNewConversation);
+    webSearchBtn.addEventListener('click', handleWebSearch);
+    importGithubBtn.addEventListener('click', handleGitHubImport);
     
     // --- INITIALIZATION ---
     const init = () => {
