@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal AI Assistant</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside id="sidebar">
+      <header>
+        <h2>Projects</h2>
+        <button id="new-project-btn" data-tooltip="Create a new project">+</button>
+      </header>
+      <div id="project-list" class="list-container"></div>
+      
+      <header>
+        <h3>Conversations</h3>
+        <button id="new-conv-btn" data-tooltip="Start a new conversation" disabled>+</button>
+      </header>
+      <div id="conv-list" class="list-container"></div>
+
+      <footer>
+        <button id="import-github-btn" class="outline">Import GitHub</button>
+      </footer>
+    </aside>
+
+    <main id="main-content">
+      <div id="chat-window">
+        <div id="welcome-message">
+            <h1>Welcome!</h1>
+            <p>Select a project and conversation to begin, or create a new one.</p>
+        </div>
+        <div id="chat-messages" class="hidden"></div>
+      </div>
+      <form id="chat-form" autocomplete="off">
+        <div class="search-container">
+          <input id="web-query" type="search" placeholder="Search the web for context...">
+          <button id="web-search-btn" type="button" class="outline">Search</button>
+        </div>
+        <textarea id="user-input" placeholder="Type your message here..." rows="3"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </main>
+  </div>
+  
+  <script src="/static/script.js"></script>
+</body>
+  </html>
