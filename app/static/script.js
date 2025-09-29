@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatForm: document.getElementById('chat-form'),
         userInput: document.getElementById('user-input'),
         sendBtn: document.getElementById('send-btn'),
+        chatWindow: document.getElementById('chat-window'), // Tambahkan ini
         chatMessages: document.getElementById('chat-messages'),
         welcomeMessage: document.getElementById('welcome-message'),
         aiStatusText: document.getElementById('ai-status-text'),
@@ -27,8 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
         toast: document.getElementById('toast'),
         importGithubBtn: document.getElementById('import-github-btn'),
         uploadFileBtn: document.getElementById('upload-file-btn'),
-
-        // Elemen baru untuk mobile
         sidebarLeft: document.getElementById('sidebar-left'),
         sidebarRight: document.getElementById('sidebar-right'),
         toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
@@ -157,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = marked.parse(content);
         dom.chatMessages.appendChild(div);
         processCodeBlocks(div);
-        dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+        // Pindahkan auto-scroll ke onmessage
         return div;
     };
     
@@ -169,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
             appendMessage('user', chat.message);
             appendMessage('ai', chat.ai_response);
         });
+        // Scroll ke bawah setelah memuat riwayat chat
+        dom.chatWindow.scrollTop = dom.chatWindow.scrollHeight;
     };
 
     // --- DATA FETCHING & ACTIONS ---
@@ -213,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title)}`);
                     state.currentConvId = newConv.id;
                     await actions.loadConversations();
-                    renderChats([]); // Clear chat window for new conversation
+                    renderChats([]);
                 } catch (err) {
                      showToast('Failed to create conversation.', 'error');
                      console.error(err);
@@ -261,51 +262,43 @@ document.addEventListener('DOMContentLoaded', () => {
             const projectContainer = e.target.closest('.list-item');
             if (!projectContainer) {
                 const deleteButton = e.target.closest('.delete-btn');
-                if(deleteButton) {
-                    actions.handleDeleteProject(parseInt(deleteButton.dataset.projectId));
-                }
+                if(deleteButton) actions.handleDeleteProject(parseInt(deleteButton.dataset.projectId));
                 return;
             }
             const projectId = parseInt(projectContainer.dataset.projectId);
-            if (!projectId || isNaN(projectId)) return;
+            if (!projectId || isNaN(projectId) || state.currentProjectId === projectId) return;
 
-            if (state.currentProjectId !== projectId) {
-                state.currentProjectId = projectId;
-                state.currentConvId = null;
-                state.conversations = [];
-                renderProjects();
-                renderConversations();
-                dom.chatMessages.innerHTML = '';
-                dom.chatMessages.classList.add('hidden');
-                dom.welcomeMessage.classList.remove('hidden');
-                await actions.loadConversations();
-                closeSidebars();
-            }
+            state.currentProjectId = projectId;
+            state.currentConvId = null;
+            state.conversations = [];
+            renderProjects();
+            renderConversations();
+            dom.chatMessages.innerHTML = '';
+            dom.chatMessages.classList.add('hidden');
+            dom.welcomeMessage.classList.remove('hidden');
+            await actions.loadConversations();
+            closeSidebars();
         },
         handleConvClick: async (e) => {
             const convContainer = e.target.closest('.list-item');
             if (!convContainer) {
                  const deleteButton = e.target.closest('.delete-btn');
-                if(deleteButton) {
-                    actions.handleDeleteConversation(parseInt(deleteButton.dataset.convId));
-                }
+                if(deleteButton) actions.handleDeleteConversation(parseInt(deleteButton.dataset.convId));
                 return;
             }
             const convId = parseInt(convContainer.dataset.convId);
-            if (!convId || isNaN(convId)) return;
+            if (!convId || isNaN(convId) || state.currentConvId === convId) return;
 
-            if (state.currentConvId !== convId) {
-                state.currentConvId = convId;
-                renderConversations();
-                try {
-                    const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
-                    renderChats(chats);
-                } catch (err) {
-                    showToast('Failed to load chats.', 'error');
-                    console.error(err);
-                }
-                closeSidebars();
+            state.currentConvId = convId;
+            renderConversations();
+            try {
+                const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
+                renderChats(chats);
+            } catch (err) {
+                showToast('Failed to load chats.', 'error');
+                console.error(err);
             }
+            closeSidebars();
         },
     };
 
@@ -313,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const setupWebSocket = () => {
         const message = dom.userInput.value.trim();
         if (!message || !state.currentProjectId || !state.currentConvId) {
-            console.log('DEBUG: WebSocket setup aborted. Missing message or IDs.');
             if(!message) showToast("Please type a message first.", "error");
             if(!state.currentConvId) showToast("Please select a conversation first.", "error");
             return;
@@ -324,17 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/ai?project_id=${state.currentProjectId}&conversation_id=${state.currentConvId}`;
-        console.log('DEBUG: Connecting to WebSocket:', wsUrl); // LOG 1
         state.ws = new WebSocket(wsUrl);
 
         let lastAiMessageElement = null;
         let fullResponse = '';
 
         state.ws.onopen = () => {
-            console.log('DEBUG: WebSocket connection opened.'); // LOG 2
             appendMessage('user', message);
+            dom.chatWindow.scrollTop = dom.chatWindow.scrollHeight; // Scroll saat mengirim
             const payload = JSON.stringify({ msg: message });
-            console.log('DEBUG: Sending message:', payload); // LOG 3
             state.ws.send(payload);
             dom.userInput.value = '';
             autoResizeTextarea();
@@ -342,7 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         state.ws.onmessage = (event) => {
-            console.log('DEBUG: WebSocket message received:', event.data); // LOG 4
+            // --- LOGIKA AUTO-SCROLL CERDAS DI SINI ---
+            const scrollThreshold = 50; // Jarak toleransi dari bawah
+            const chatWindow = dom.chatWindow;
+            const isScrolledToBottom = chatWindow.scrollHeight - chatWindow.clientHeight <= chatWindow.scrollTop + scrollThreshold;
+
             try {
                 const data = JSON.parse(event.data);
                 if (data.status === 'update') {
@@ -359,12 +353,15 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 fullResponse += event.data;
                 lastAiMessageElement.innerHTML = marked.parse(fullResponse + '█');
-                dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+            }
+
+            // Hanya auto-scroll jika pengguna sudah berada di bawah
+            if(isScrolledToBottom) {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
             }
         };
 
-        state.ws.onclose = (event) => {
-            console.log('DEBUG: WebSocket connection closed.', event); // LOG 5
+        state.ws.onclose = () => {
             setLoading(false);
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = marked.parse(fullResponse);
@@ -375,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.ws.onerror = (error) => {
             setLoading(false, 'Error');
             showToast('WebSocket connection failed.', 'error');
-            console.error('WebSocket error:', error); // LOG 6
+            console.error('WebSocket error:', error);
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = "<p><strong>Error:</strong> Could not connect to the AI service.</p>";
             }
