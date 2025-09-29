@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-cerebras_cloud_sdk
+cerebras-cloud-sdk
 PyGithub
 requests
 beautifulsoup4
