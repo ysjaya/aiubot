@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from cerebras_cloud_sdk import Cerebras
+from cerebras.cloud.sdk import Cerebras  # <-- BARIS INI TELAH DIPERBARUI
 from sqlmodel import Session, select
 
 from app.db import models
