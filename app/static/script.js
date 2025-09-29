@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
         toast: document.getElementById('toast'),
         importGithubBtn: document.getElementById('import-github-btn'),
         uploadFileBtn: document.getElementById('upload-file-btn'),
+
+        // Elemen baru untuk mobile
+        sidebarLeft: document.getElementById('sidebar-left'),
+        sidebarRight: document.getElementById('sidebar-right'),
+        toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
+        toggleRightSidebarBtn: document.getElementById('toggle-right-sidebar-btn'),
+        mobileOverlay: document.getElementById('mobile-overlay'),
     };
 
     // --- UI & STATE UPDATERS ---
@@ -206,9 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title)}`);
                     state.currentConvId = newConv.id;
                     await actions.loadConversations();
-                    dom.chatMessages.innerHTML = '';
-                    dom.welcomeMessage.classList.remove('hidden');
-                    dom.chatMessages.classList.add('hidden');
+                    renderChats([]); // Clear chat window for new conversation
                 } catch (err) {
                      showToast('Failed to create conversation.', 'error');
                      console.error(err);
@@ -255,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         handleProjectClick: async (e) => {
             const projectContainer = e.target.closest('.list-item');
             if (!projectContainer) {
-                // Check if delete button was clicked inside the container
                 const deleteButton = e.target.closest('.delete-btn');
                 if(deleteButton) {
                     actions.handleDeleteProject(parseInt(deleteButton.dataset.projectId));
@@ -275,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dom.chatMessages.classList.add('hidden');
                 dom.welcomeMessage.classList.remove('hidden');
                 await actions.loadConversations();
+                closeSidebars();
             }
         },
         handleConvClick: async (e) => {
@@ -299,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast('Failed to load chats.', 'error');
                     console.error(err);
                 }
+                closeSidebars();
             }
         },
     };
@@ -375,6 +381,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     };
+
+    // --- Mobile Sidebar Toggles ---
+    const closeSidebars = () => {
+        dom.sidebarLeft.classList.remove('open');
+        dom.sidebarRight.classList.remove('open');
+        dom.mobileOverlay.classList.add('hidden');
+    };
+    
+    dom.toggleLeftSidebarBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSidebars();
+        dom.sidebarLeft.classList.add('open');
+        dom.mobileOverlay.classList.remove('hidden');
+    });
+
+    dom.toggleRightSidebarBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSidebars();
+        dom.sidebarRight.classList.add('open');
+        dom.mobileOverlay.classList.remove('hidden');
+    });
+
+    dom.mobileOverlay.addEventListener('click', closeSidebars);
+
 
     // --- EVENT LISTENERS ---
     dom.newProjectBtn.addEventListener('click', actions.handleNewProject);
