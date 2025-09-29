@@ -1,10 +1,45 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-    </head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Coder Assistant</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
 <body>
     <div id="app-container">
+        <aside id="sidebar-left">
+            <header class="sidebar-header">
+                <h3><i class="fas fa-folder"></i> Projects</h3>
+                <button id="new-project-btn" data-tooltip="New Project" class="icon-btn"><i class="fas fa-plus"></i></button>
+            </header>
+            <div id="project-list" class="list-container"></div>
+            
+            <header class="sidebar-header">
+                <h3><i class="fas fa-comments"></i> Conversations</h3>
+                <button id="new-conv-btn" data-tooltip="New Conversation" class="icon-btn" disabled><i class="fas fa-plus"></i></button>
+            </header>
+            <div id="conv-list" class="list-container"></div>
+        </aside>
+
         <main id="main-content">
+            <header id="mobile-header">
+                <button id="toggle-left-sidebar-btn" class="icon-btn"><i class="fas fa-folder-open"></i></button>
+                <span class="mobile-title">AI Assistant</span>
+                <button id="toggle-right-sidebar-btn" class="icon-btn"><i class="fas fa-file-alt"></i></button>
+            </header>
+            
+            <div id="chat-window">
+                <div id="welcome-message">
+                    <i class="fas fa-robot welcome-icon"></i>
+                    <h1>AI Coder Assistant</h1>
+                    <p>Select a project and conversation, or create a new one to begin.</p>
+                </div>
+                <div id="chat-messages" class="hidden"></div>
+            </div>
             <footer id="chat-input-area">
                 <div id="status-bar">
                     <span id="ai-status-text">Ready</span>
@@ -18,7 +53,22 @@
                 </form>
             </footer>
         </main>
-        </div>
+
+        <aside id="sidebar-right">
+             <header class="sidebar-header">
+                <h3><i class="fas fa-file-alt"></i> Project Files</h3>
+                <div>
+                    <button id="import-github-btn" data-tooltip="Import from GitHub" class="icon-btn"><i class="fab fa-github"></i></button>
+                    <button id="upload-file-btn" data-tooltip="Upload File" class="icon-btn"><i class="fas fa-upload"></i></button>
+                </div>
+            </header>
+            <div id="file-list" class="list-container">
+                <small>No files in this project yet.</small>
+            </div>
+        </aside>
+    </div>
+
+    <div id="mobile-overlay" class="hidden"></div>
 
     <dialog id="github-modal">
         <article>
@@ -33,5 +83,10 @@
     
     <input type="file" id="file-upload-input" class="hidden">
 
-    </body>
+    <div id="toast" class="hidden"></div>
+  
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
                     </html>
