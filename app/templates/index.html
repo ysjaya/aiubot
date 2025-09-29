@@ -26,6 +26,12 @@
         </aside>
 
         <main id="main-content">
+            <header id="mobile-header">
+                <button id="toggle-left-sidebar-btn" class="icon-btn"><i class="fas fa-folder-open"></i></button>
+                <span class="mobile-title">AI Assistant</span>
+                <button id="toggle-right-sidebar-btn" class="icon-btn"><i class="fas fa-file-alt"></i></button>
+            </header>
+            
             <div id="chat-window">
                 <div id="welcome-message">
                     <i class="fas fa-robot welcome-icon"></i>
@@ -62,10 +68,12 @@
         </aside>
     </div>
 
+    <div id="mobile-overlay" class="hidden"></div>
+
     <div id="toast" class="hidden"></div>
   
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="/static/script.js"></script>
 </body>
-              </html>
+                        </html>
