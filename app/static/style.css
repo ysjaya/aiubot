@@ -91,7 +91,7 @@ html, body {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    flex-shrink: 0; /* Mencegah tombol menyusut */
+    flex-shrink: 0;
 }
 .icon-btn:hover { background-color: var(--card-bg); color: var(--text-color); }
 
@@ -149,25 +149,26 @@ html, body {
 
 /* --- PERUBAHAN DI SINI --- */
 .input-wrapper {
-    display: flex;
-    align-items: flex-end; /* Jaga agar tombol dan textarea align di bawah */
-    gap: 0.5rem; /* Beri jarak antara textarea dan tombol */
+    position: relative; /* Jadi wadah untuk tombol absolute */
 }
+
 #user-input { 
-    flex: 1; /* Ambil semua sisa ruang */
+    width: 100%; /* Ambil lebar penuh */
     border-radius: var(--pico-border-radius); 
     background-color: var(--input-bg); 
     border-color: var(--border-color); 
     resize: none; 
-    padding: 0.75rem 1rem; /* Padding normal, tidak perlu ruang ekstra */
+    padding: 0.75rem 3.5rem 0.75rem 1rem; /* Beri ruang KOSONG di kanan untuk tombol */
     max-height: 200px; 
     overflow-y: auto; 
 }
+
 #send-btn { 
-    margin-bottom: 4px; /* Sesuaikan posisi vertikal tombol agar sejajar */
+    position: absolute; /* Tombol keluar dari alur normal */
+    right: 0.5rem;      /* Posisi 0.5rem dari kanan wrapper */
+    bottom: 0.5rem;     /* Posisi 0.5rem dari bawah wrapper */
 }
 /* --- AKHIR PERUBAHAN --- */
-
 
 /* --- Spinner --- */
 .spinner { border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
@@ -208,4 +209,4 @@ html, body {
         background-color: var(--sidebar-bg);
     }
     .mobile-title { font-weight: bold; }
-}
+    }
