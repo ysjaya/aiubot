@@ -1,12 +1,17 @@
 FROM python:3.11-slim
 
-# Menambahkan build tools yang diperlukan untuk beberapa paket Python
+# Menambahkan build tools yang diperlukan
 RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
 
+# Menetapkan direktori kerja di dalam container
 WORKDIR /app
-COPY . .
-RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# CMD diubah untuk menggunakan environment variable $PORT dari Kinsta.
-# Jangan gunakan "EXPOSE 8000" karena port tidak lagi tetap.
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Menyalin file requirements terlebih dahulu untuk caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && pip install -r requirements.txt
+
+# Menyalin seluruh kode aplikasi
+COPY ./app /app
+
+# Perintah untuk menjalankan aplikasi
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
