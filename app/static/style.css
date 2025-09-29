@@ -1,468 +1,68 @@
-/* --------------------------------------------------------------
-   GLOBAL VARIABLES & ROOT SETTINGS
-   -------------------------------------------------------------- */
-:root {
-    --sidebar-bg: #ac;
-    --main-bg: #f;
-    --border-color: #b;
-    --text-color: #dddb;
-    --accent-color: #caed;
-    --card-bg: #d;
-    --input-bg: #da;
-    --text-muted: #b;
-    --success-color: #ce;
-    --error-color: #ef;
-    --pico-border-radius: .rem;          /* [ROBUSTNESS] default radius */
-    --touch-target-min: px;               /* [MOBILE] minimum touch area */
-    --input-padding-right: .rem;         /* room for send button */
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Coding Assistant</title>
+    <link rel="stylesheet" href="/static/style.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <button id="menu-toggle" class="icon-button"><i class="fas fa-bars"></i></button>
+            <h1>AI Coding Assistant</h1>
+            <div id="ai-status">
+                <div id="spinner" class="spinner hidden"></div>
+                <span id="ai-status-text">Ready</span>
+            </div>
+        </header>
 
-/* --------------------------------------------------------------
-   BASE STYLES
-   -------------------------------------------------------------- */
-html,
-body {
-    /* [ROBUSTNESS] fallback for browsers without dvh support */
-    height: vh;
-    height: dvh;
-    overflow: hidden;
-    color: var(--text-color);
-    background-color: var(--main-bg);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
-                 Roboto, Helvetica, Arial, sans-serif;
-    color-scheme: dark;                    /* enable dark mode */
-}
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3>Projects</h3>
+                <div class="list-header">
+                    <span>Your Projects</span>
+                    <button id="new-project-btn" class="icon-button" data-tooltip="New Project">+</button>
+                </div>
+                <div id="project-list" class="project-list">
+                    </div>
+            </div>
+            <div class="sidebar-section">
+                <h3>History</h3>
+                 <div class="list-header">
+                    <span>Conversations</span>
+                    <button id="new-conv-btn" class="icon-button" data-tooltip="New Conversation" disabled>+</button>
+                </div>
+                <div id="history-list" class="history-list">
+                    </div>
+            </div>
+        </aside>
 
-/* --------------------------------------------------------------
-   LAYOUT CONTAINER
-   -------------------------------------------------------------- */
-#app-container {
-    display: flex;
-    height: %;
-    position: relative;
-}
+        <main class="main-content">
+            <div id="chat-container" class="chat-container">
+                <div id="welcome-message" class="welcome-message">
+                    <h2>Welcome!</h2>
+                    <p>Select a project and conversation to start.</p>
+                </div>
+            </div>
+        </main>
 
-/* --------------------------------------------------------------
-   SIDEBARS (LEFT & RIGHT)
-   -------------------------------------------------------------- */
-#sidebar-left,
-#sidebar-right {
-    display: flex;
-    flex-direction: column;
-    background-color: var(--sidebar-bg);
-    border-right: px solid var(--border-color);
-    padding: rem;
-    overflow-y: auto;
-    transition: transform .s ease-in-out;
-    z-index: ;
-}
-#sidebar-left { width: px; flex-shrink: ; }
-#sidebar-right {
-    width: px;
-    border-left: px solid var(--border-color);
-    border-right: none;
-    flex-shrink: ;
-}
+        <footer class="footer">
+            <div class="chat-input">
+                <textarea id="user-input" placeholder="Enter your prompt here..."></textarea>
+                <button id="send-btn" class="send-button">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </footer>
+    </div>
 
-/* --------------------------------------------------------------
-   SIDEBAR HEADER
-   -------------------------------------------------------------- */
-.sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: rem;
-    padding-bottom: .rem;
-    border-bottom: px solid var(--border-color);
-}
-.sidebar-header h {
-    margin: ;
-    font-size: clamp(.rem, vw, rem);
-}
-.sidebar-header .fas,
-.sidebar-header .fab {
-    margin-right: .rem;
-}
+    <div id="toast" class="hidden"></div>
 
-/* --------------------------------------------------------------
-   LIST ITEMS
-   -------------------------------------------------------------- */
-.list-container { flex-grow: ; }
-
-.list-item-container {
-    display: flex;
-    align-items: center;
-    border-radius: var(--pico-border-radius);
-    margin-bottom: .rem;
-    transition: background-color .s ease;
-}
-.list-item-container:hover { background-color: var(--card-bg); }
-
-.list-item {
-    flex-grow: ;
-    padding: .rem .rem;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.list-item.active {
-    background-color: var(--accent-color);
-    color: #fff;
-    font-weight: ;
-}
-
-/* --------------------------------------------------------------
-   DELETE BUTTON (visible on hover)
-   -------------------------------------------------------------- */
-.delete-btn {
-    visibility: hidden;
-    opacity: .;
-}
-.list-item-container:hover .delete-btn { visibility: visible; }
-.delete-btn:hover {
-    opacity: ;
-    color: var(--error-color);
-}
-
-/* --------------------------------------------------------------
-   ICON BUTTONS (generic)
-   -------------------------------------------------------------- */
-.icon-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: .rem;
-    border-radius: %;
-    width: var(--touch-target-min);
-    height: var(--touch-target-min);
-    min-width: var(--touch-target-min);
-    min-height: var(--touch-target-min);
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    transition: background-color .s ease, color .s ease;
-}
-.icon-btn:hover {
-    background-color: var(--card-bg);
-    color: var(--text-color);
-}
-.icon-btn:focus-visible {                     /* [ACC] focus styling */
-    outline: px solid var(--accent-color);
-    outline-offset: px;
-}
-
-/* --------------------------------------------------------------
-   MAIN CONTENT AREA
-   -------------------------------------------------------------- */
-#main-content {
-    flex: ;
-    display: flex;
-    flex-direction: column;
-    height: %;
-    min-width: ;               /* prevents overflow */
-}
-
-/* --------------------------------------------------------------
-   CHAT WINDOW
-   -------------------------------------------------------------- */
-#chat-window {
-    flex-grow: ;
-    overflow-y: auto;
-    padding: rem rem;
-    scroll-behavior: smooth;
-}
-#welcome-message {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: %;
-    text-align: center;
-    color: var(--text-muted);
-}
-.welcome-icon {
-    font-size: rem;
-    margin-bottom: rem;
-}
-#chat-messages.hidden { display: none; }
-
-/* --------------------------------------------------------------
-   MESSAGE BUBBLES
-   -------------------------------------------------------------- */
-.message {
-    max-width: %;
-    padding: rem;
-    margin-bottom: .rem;
-    border-radius: var(--pico-border-radius);
-    line-height: .;
-    word-wrap: break-word;
-}
-.message.user {
-    background-color: var(--card-bg);
-    margin-left: auto;
-}
-.message.ai {
-    background-color: transparent;
-    border: px solid var(--border-color);
-    margin-right: auto;
-}
-
-/* --------------------------------------------------------------
-   CODE BLOCKS
-   -------------------------------------------------------------- */
-.message pre {
-    padding: rem;
-    background-color: #d;
-    border-radius: var(--pico-border-radius);
-    border: px solid var(--border-color);
-    white-space: pre-wrap;
-    overflow-x: auto;
-    font-size: clamp(.rem, .vw, .rem);
-}
-.code-block-wrapper {
-    position: relative;
-    margin: rem ;
-}
-.code-toolbar {
-    position: absolute;
-    top: .rem;
-    right: .rem;
-    opacity: ;
-    transition: opacity .s ease-in-out;
-    display: flex;
-    gap: .rem;
-}
-.code-block-wrapper:hover .code-toolbar { opacity: ; }
-.code-toolbar button {
-    padding: .rem .rem;
-    font-size: .rem;
-    background-color: var(--main-bg);
-    border: px solid var(--border-color);
-    color: var(--text-color);
-    cursor: pointer;
-    border-radius: var(--pico-border-radius);
-    min-width: var(--touch-target-min);
-    min-height: var(--touch-target-min);
-}
-.code-toolbar button:hover {
-    background-color: var(--accent-color);
-    color: #fff;
-}
-.code-toolbar button:focus-visible {
-    outline: px solid var(--accent-color);
-    outline-offset: px;
-}
-
-/* --------------------------------------------------------------
-   CHAT INPUT AREA (refactored)
-   -------------------------------------------------------------- */
-#chat-input-area {
-    padding: rem rem;
-    border-top: px solid var(--border-color);
-    background-color: var(--sidebar-bg);
-    flex-shrink: ;
-}
-#status-bar {
-    display: flex;
-    align-items: center;
-    gap: .rem;
-    font-size: clamp(.rem, .vw, .rem);
-    color: var(--text-muted);
-    margin-bottom: .rem;
-    height: px;
-}
-
-/* --------------------------------------------------------------
-   INPUT WRAPPER (flex layout)
-   -------------------------------------------------------------- */
-.input-wrapper {                               /* [MOBILE] Input area with safe‑area support */
-    position: relative;
-    display: flex;
-    align-items: flex-end;
-}
-
-/* --------------------------------------------------------------
-   TEXTAREA INPUT
-   -------------------------------------------------------------- */
-#user-input {
-    width: %;
-    border-radius: var(--pico-border-radius);
-    background-color: var(--input-bg);
-    border: px solid var(--border-color);
-    resize: none;
-    padding: .rem var(--input-padding-right) .rem rem;
-    max-height: px;
-    overflow-y: auto;
-    font-size: clamp(.rem, vw, rem);
-    color: var(--text-color);
-}
-#user-input:focus-visible {                     /* [ACC] focus styling */
-    outline: px solid var(--accent-color);
-    outline-offset: -px;
-}
-
-/* --------------------------------------------------------------
-   SEND BUTTON (absolute inside flex wrapper)
-   -------------------------------------------------------------- */
-#send-btn {
-    position: absolute;
-    right: .rem;
-    bottom: .rem;
-    width: var(--touch-target-min);
-    height: var(--touch-target-min);
-    min-width: var(--touch-target-min);
-    min-height: var(--touch-target-min);
-    border-radius: %;
-    background-color: var(--accent-color);
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: background-color .s ease;
-}
-#send-btn:hover { background-color: #dd; }
-#send-btn:focus-visible {                       /* [ACC] focus styling */
-    outline: px solid #fff;
-    outline-offset: px;
-}
-#send-btn svg {
-    width: px;
-    height: px;
-}
-
-/* --------------------------------------------------------------
-   SPINNER (loading indicator)
-   -------------------------------------------------------------- */
-.spinner {
-    border: px solid var(--border-color);
-    border-top: px solid var(--accent-color);
-    border-radius: %;
-    width: px;
-    height: px;
-    animation: spin s linear infinite;
-}
-@keyframes spin {
-    %   { transform: rotate(deg); }
-    % { transform: rotate(deg); }
-}
-
-/* --------------------------------------------------------------
-   TOAST NOTIFICATION
-   -------------------------------------------------------------- */
-#toast {
-    position: fixed;
-    bottom: px;
-    left: %;
-    transform: translateX(-%);
-    padding: rem .rem;
-    border-radius: var(--pico-border-radius);
-    color: #fff;
-    opacity: ;
-    transition: opacity .s ease, bottom .s ease;
-    z-index: ;
-    max-width: %;
-    text-align: center;
-    font-size: clamp(.rem, vw, rem);
-}
-#toast.show { opacity: ; bottom: px; }
-#toast.success { background-color: var(--success-color); }
-#toast.error   { background-color: var(--error-color); }
-
-.hidden { display: none !important; }
-
-/* --------------------------------------------------------------
-   MOBILE HEADER & OVERLAY
-   -------------------------------------------------------------- */
-#mobile-header {
-    display: none;                               /* shown only on mobile */
-    justify-content: space-between;
-    align-items: center;
-    padding: .rem rem;
-    border-bottom: px solid var(--border-color);
-    background-color: var(--sidebar-bg);
-    height: px;
-}
-.mobile-title {
-    font-weight: bold;
-    font-size: clamp(rem, vw, .rem);
-}
-.mobile-menu-btn {
-    width: var(--touch-target-min);
-    height: var(--touch-target-min);
-    min-width: var(--touch-target-min);
-    min-height: var(--touch-target-min);
-}
-
-/* Overlay that appears when a sidebar is open */
-#mobile-overlay {
-    position: fixed;
-    top: ; left: ; right: ; bottom: ;
-    background-color: rgba(,,,.);
-    z-index: ;
-    opacity: ;
-    visibility: hidden;
-    transition: opacity .s ease, visibility .s ease;
-}
-#mobile-overlay.open {
-    opacity: ;
-    visibility: visible;
-}
-
-/* --------------------------------------------------------------
-   RESPONSIVE STYLES (tablet & mobile)
-   -------------------------------------------------------------- */
-@media (max-width: px) {
-    /* Sidebar behavior on small screens */
-    #sidebar-left,
-    #sidebar-right {
-        position: absolute;
-        top: ;
-        bottom: ;
-        box-shadow:   px rgba(,,,.);
-    }
-    #sidebar-left { transform: translateX(-%); }
-    #sidebar-right { right: ; transform: translateX(%); }
-    #sidebar-left.open,
-    #sidebar-right.open { transform: translateX(); }
-
-    /* Reduce padding for chat window & input area */
-    #chat-window,
-    #chat-input-area {
-        padding: rem;
-    }
-
-    /* Safe‑area padding for iOS home indicator */
-    #chat-input-area {
-        padding-bottom: calc(rem + env(safe-area-inset-bottom));
-    }
-
-    /* Larger touch targets & font size */
-    #user-input {
-        padding: rem calc(var(--input-padding-right) + .rem) rem .rem;
-        font-size: rem;
-    }
-    #send-btn {
-        width: px;
-        height: px;
-        bottom: rem;
-    }
-
-    /* Show mobile header */
-    #mobile-header { display: flex; }
-}
-
-/* --------------------------------------------------------------
-   PREFER REDUCED MOTION
-   -------------------------------------------------------------- */
-@media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: .01ms !important;
-        animation-iteration-count:  !important;
-        transition-duration: .01ms !important;
-    }
-        }
-        
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
