@@ -1,3 +1,4 @@
+cerebras-cloud-sdk
 fastapi
 uvicorn[standard]
 openai
