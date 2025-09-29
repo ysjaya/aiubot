@@ -3,106 +3,123 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         projects: [],
         conversations: [],
+        files: [],
         currentProjectId: null,
         currentConvId: null,
+        isLoading: false,
         ws: null,
     };
 
     // --- DOM ELEMENTS ---
-    const projectList = document.getElementById('project-list');
-    const convList = document.getElementById('conv-list');
-    const newProjectBtn = document.getElementById('new-project-btn');
-    const newConvBtn = document.getElementById('new-conv-btn');
-    const chatForm = document.getElementById('chat-form');
-    const userInput = document.getElementById('user-input');
-    const chatMessages = document.getElementById('chat-messages');
-    const welcomeMessage = document.getElementById('welcome-message');
-    const webQueryInput = document.getElementById('web-query');
-    const webSearchBtn = document.getElementById('web-search-btn');
-    const importGithubBtn = document.getElementById('import-github-btn');
+    const dom = {
+        projectList: document.getElementById('project-list'),
+        convList: document.getElementById('conv-list'),
+        fileList: document.getElementById('file-list'),
+        newProjectBtn: document.getElementById('new-project-btn'),
+        newConvBtn: document.getElementById('new-conv-btn'),
+        chatForm: document.getElementById('chat-form'),
+        userInput: document.getElementById('user-input'),
+        sendBtn: document.getElementById('send-btn'),
+        chatMessages: document.getElementById('chat-messages'),
+        welcomeMessage: document.getElementById('welcome-message'),
+        aiStatusText: document.getElementById('ai-status-text'),
+        spinner: document.getElementById('spinner'),
+        toast: document.getElementById('toast'),
+        importGithubBtn: document.getElementById('import-github-btn'),
+        uploadFileBtn: document.getElementById('upload-file-btn'),
+    };
+
+    // --- UI & STATE UPDATERS ---
+    const setLoading = (loading, message = 'Ready') => {
+        state.isLoading = loading;
+        dom.spinner.classList.toggle('hidden', !loading);
+        dom.userInput.disabled = loading;
+        dom.sendBtn.disabled = loading;
+        if (loading) {
+            dom.aiStatusText.textContent = "AI is thinking...";
+        } else {
+            dom.aiStatusText.textContent = message;
+        }
+    };
+    
+    const showToast = (message, type = 'success') => {
+        dom.toast.textContent = message;
+        dom.toast.className = type;
+        dom.toast.classList.add('show');
+        setTimeout(() => dom.toast.classList.remove('show'), 3000);
+    };
+
+    const autoResizeTextarea = () => {
+        dom.userInput.style.height = 'auto';
+        const newHeight = dom.userInput.scrollHeight;
+        dom.userInput.style.height = `${newHeight}px`;
+    };
 
     // --- API HELPERS ---
     const api = {
-        get: (url) => fetch(`/api${url}`).then(res => res.json()),
-        post: (url, data = {}) => fetch(`/api${url}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        }).then(res => res.json()),
-        delete: (url) => fetch(`/api${url}`, { method: 'DELETE' }).then(res => res.json()),
+        get: async (url) => {
+            const response = await fetch(`/api${url}`);
+            if (!response.ok) throw new Error(`API Error: ${response.statusText} (${response.status})`);
+            return response.json();
+        },
+        post: async (url, data = {}) => {
+            const response = await fetch(`/api${url}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) throw new Error(`API Error: ${response.statusText} (${response.status})`);
+            return response.json();
+        },
+        delete: async (url) => {
+            const response = await fetch(`/api${url}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(`API Error: ${response.statusText} (${response.status})`);
+            return response.json();
+        },
     };
 
-    // --- RENDER & UI FUNCTIONS ---
+    // --- RENDER FUNCTIONS ---
     const renderProjects = () => {
-        projectList.innerHTML = '';
+        dom.projectList.innerHTML = '';
         if (state.projects.length === 0) {
-            projectList.innerHTML = '<small>No projects yet. Create one!</small>';
+            dom.projectList.innerHTML = '<small>No projects yet. Create one!</small>';
+        } else {
+            state.projects.forEach(p => {
+                const item = `
+                    <div class="list-item-container">
+                        <div class="list-item ${p.id === state.currentProjectId ? 'active' : ''}" data-project-id="${p.id}">${p.name}</div>
+                        <button class="icon-btn delete-btn" data-project-id="${p.id}" data-tooltip="Delete Project"><i class="fas fa-trash-alt"></i></button>
+                    </div>`;
+                dom.projectList.insertAdjacentHTML('beforeend', item);
+            });
         }
-        state.projects.forEach(p => {
-            const container = document.createElement('div');
-            container.className = 'list-item-container';
-
-            const item = document.createElement('div');
-            item.className = 'list-item';
-            item.textContent = p.name;
-            item.dataset.projectId = p.id;
-            if (p.id === state.currentProjectId) {
-                item.classList.add('active');
-            }
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.textContent = '🗑️';
-            deleteBtn.dataset.projectId = p.id;
-            
-            container.appendChild(item);
-            container.appendChild(deleteBtn);
-            projectList.appendChild(container);
-        });
     };
 
     const renderConversations = () => {
-        convList.innerHTML = '';
+        dom.convList.innerHTML = '';
+        dom.newConvBtn.disabled = !state.currentProjectId;
         if (!state.currentProjectId) {
-            convList.innerHTML = '<small>Select a project first.</small>';
-            newConvBtn.disabled = true;
-            return;
+            dom.convList.innerHTML = '<small>Select a project first.</small>';
+        } else if (state.conversations.length === 0) {
+            dom.convList.innerHTML = '<small>No conversations yet.</small>';
+        } else {
+            state.conversations.forEach(c => {
+                const item = `
+                    <div class="list-item-container">
+                        <div class="list-item ${c.id === state.currentConvId ? 'active' : ''}" data-conv-id="${c.id}">${c.title}</div>
+                        <button class="icon-btn delete-btn" data-conv-id="${c.id}" data-tooltip="Delete Conversation"><i class="fas fa-trash-alt"></i></button>
+                    </div>`;
+                dom.convList.insertAdjacentHTML('beforeend', item);
+            });
         }
-        newConvBtn.disabled = false;
-        if (state.conversations.length === 0) {
-            convList.innerHTML = '<small>No conversations yet.</small>';
-        }
-        state.conversations.forEach(c => {
-            const container = document.createElement('div');
-            container.className = 'list-item-container';
-
-            const item = document.createElement('div');
-            item.className = 'list-item';
-            item.textContent = c.title;
-            item.dataset.convId = c.id;
-            if (c.id === state.currentConvId) {
-                item.classList.add('active');
-            }
-            
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.textContent = '🗑️';
-            deleteBtn.dataset.convId = c.id;
-
-            container.appendChild(item);
-            container.appendChild(deleteBtn);
-            convList.appendChild(container);
-        });
     };
-
+    
     const processCodeBlocks = (element) => {
         const codeBlocks = element.querySelectorAll('pre code');
         codeBlocks.forEach(block => {
             if (block.dataset.highlighted) return;
-            
             hljs.highlightElement(block);
             block.dataset.highlighted = 'true';
-
             const pre = block.parentElement;
             if (pre.parentElement.classList.contains('code-block-wrapper')) return;
 
@@ -110,10 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
             wrapper.className = 'code-block-wrapper';
             pre.parentNode.insertBefore(wrapper, pre);
             wrapper.appendChild(pre);
-            
             const toolbar = document.createElement('div');
             toolbar.className = 'code-toolbar';
-
             const copyBtn = document.createElement('button');
             copyBtn.textContent = 'Copy';
             copyBtn.onclick = () => {
@@ -122,136 +137,166 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
                 });
             };
-
-            const downloadBtn = document.createElement('button');
-            downloadBtn.textContent = 'Download';
-            downloadBtn.onclick = () => {
-                const lang = [...block.classList].find(c => c.startsWith('language-'))?.replace('language-', '') || 'txt';
-                const filename = prompt("Enter filename:", `snippet.${lang}`);
-                if (filename) {
-                    const blob = new Blob([block.textContent], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }
-            };
-            
             toolbar.appendChild(copyBtn);
-            toolbar.appendChild(downloadBtn);
             wrapper.appendChild(toolbar);
         });
     };
 
     const appendMessage = (role, content) => {
+        dom.welcomeMessage.classList.add('hidden');
+        dom.chatMessages.classList.remove('hidden');
         const div = document.createElement('div');
         div.className = `message ${role}`;
         div.innerHTML = marked.parse(content);
-        chatMessages.appendChild(div);
+        dom.chatMessages.appendChild(div);
         processCodeBlocks(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
         return div;
     };
     
     const renderChats = (chats) => {
-        welcomeMessage.classList.add('hidden');
-        chatMessages.classList.remove('hidden');
-        chatMessages.innerHTML = '';
+        dom.welcomeMessage.classList.add('hidden');
+        dom.chatMessages.classList.remove('hidden');
+        dom.chatMessages.innerHTML = '';
         chats.forEach(chat => {
             appendMessage('user', chat.message);
             appendMessage('ai', chat.ai_response);
         });
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     };
 
-    // --- IMPLEMENTASI FUNGSI API ---
-    const loadProjects = async () => {
-        state.projects = await api.get('/projects');
-        renderProjects();
-    };
-
-    const loadConversations = async () => {
-        if (!state.currentProjectId) return;
-        state.conversations = await api.get(`/project/${state.currentProjectId}/conversations`);
-        renderConversations();
-    };
-
-    const handleNewProject = async () => {
-        const name = prompt("Enter new project name:");
-        if (name) {
-            await api.post(`/project?name=${encodeURIComponent(name)}`);
-            await loadProjects();
-        }
-    };
-
-    const handleNewConversation = async () => {
-        if (!state.currentProjectId) return;
-        const title = prompt("Enter new conversation title:", "New Chat");
-        if (title) {
-            await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title)}`);
-            await loadConversations();
-        }
-    };
-
-    const handleDeleteProject = async (projectId) => {
-        if (confirm("Are you sure you want to delete this project?")) {
-            await api.delete(`/project/${projectId}`);
-            if (state.currentProjectId === projectId) {
-                state.currentProjectId = null;
-                state.currentConvId = null;
-                chatMessages.classList.add('hidden');
-                welcomeMessage.classList.remove('hidden');
+    // --- DATA FETCHING & ACTIONS ---
+    const actions = {
+        loadProjects: async () => {
+            try {
+                state.projects = await api.get('/projects');
+                renderProjects();
+            } catch (err) {
+                showToast('Failed to load projects.', 'error');
+                console.error(err);
             }
-            await loadProjects();
-            renderConversations();
-        }
-    };
-
-    const handleDeleteConversation = async (convId) => {
-        if (confirm("Are you sure you want to delete this conversation?")) {
-            await api.delete(`/conversation/${convId}`);
-            if (state.currentConvId === convId) {
-                state.currentConvId = null;
-                chatMessages.classList.add('hidden');
-                welcomeMessage.classList.remove('hidden');
+        },
+        loadConversations: async () => {
+            if (!state.currentProjectId) return;
+            try {
+                state.conversations = await api.get(`/project/${state.currentProjectId}/conversations`);
+                renderConversations();
+            } catch (err) {
+                showToast('Failed to load conversations.', 'error');
+                console.error(err);
             }
-            await loadConversations();
-        }
-    };
+        },
+        handleNewProject: async () => {
+            const name = prompt("Enter new project name:");
+            if (name) {
+                try {
+                    await api.post(`/project?name=${encodeURIComponent(name)}`);
+                    showToast('Project created!', 'success');
+                    await actions.loadProjects();
+                } catch (err) {
+                    showToast('Failed to create project.', 'error');
+                    console.error(err);
+                }
+            }
+        },
+        handleNewConversation: async () => {
+            if (!state.currentProjectId) return;
+            const title = prompt("Enter new conversation title:", "New Chat");
+            if (title) {
+                try {
+                    const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title)}`);
+                    state.currentConvId = newConv.id;
+                    await actions.loadConversations();
+                    dom.chatMessages.innerHTML = '';
+                    dom.welcomeMessage.classList.remove('hidden');
+                    dom.chatMessages.classList.add('hidden');
+                } catch (err) {
+                     showToast('Failed to create conversation.', 'error');
+                     console.error(err);
+                }
+            }
+        },
+        handleDeleteProject: async (projectId) => {
+            if (confirm("Are you sure you want to delete this project?")) {
+                try {
+                    await api.delete(`/project/${projectId}`);
+                    if (state.currentProjectId === projectId) {
+                        state.currentProjectId = null;
+                        state.currentConvId = null;
+                        state.conversations = [];
+                        dom.chatMessages.classList.add('hidden');
+                        dom.welcomeMessage.classList.remove('hidden');
+                    }
+                    await actions.loadProjects();
+                    renderConversations();
+                    showToast('Project deleted.', 'success');
+                } catch(err) {
+                    showToast('Failed to delete project.', 'error');
+                    console.error(err);
+                }
+            }
+        },
+        handleDeleteConversation: async (convId) => {
+            if (confirm("Are you sure you want to delete this conversation?")) {
+                try {
+                    await api.delete(`/conversation/${convId}`);
+                    if (state.currentConvId === convId) {
+                        state.currentConvId = null;
+                        dom.chatMessages.classList.add('hidden');
+                        dom.welcomeMessage.classList.remove('hidden');
+                    }
+                    await actions.loadConversations();
+                    showToast('Conversation deleted.', 'success');
+                } catch(err) {
+                    showToast('Failed to delete conversation.', 'error');
+                    console.error(err);
+                }
+            }
+        },
+        handleProjectClick: async (e) => {
+            const projectId = parseInt(e.target.dataset.projectId);
+            if (!projectId) return;
 
-    const handleWebSearch = async () => {
-        const query = webQueryInput.value.trim();
-        if (!query) return;
-        
-        appendMessage('user', `Searching web for: "${query}"`);
-        const results = await api.get(`/websearch?q=${encodeURIComponent(query)}`);
-        
-        let content = `**Search Results for "${query}"**\n\n`;
-        if (results.results && results.results.length > 0) {
-            results.results.forEach(res => {
-                content += `- **[${res.title}](${res.url})**: ${res.snippet}\n`;
-            });
-        } else {
-            content += "No results found.";
-        }
-        appendMessage('ai', content);
-        webQueryInput.value = '';
-    };
+            if (e.target.closest('.delete-btn')) {
+                actions.handleDeleteProject(projectId);
+            } else if (state.currentProjectId !== projectId) {
+                state.currentProjectId = projectId;
+                state.currentConvId = null;
+                state.conversations = [];
+                renderProjects();
+                renderConversations();
+                dom.chatMessages.innerHTML = '';
+                dom.chatMessages.classList.add('hidden');
+                dom.welcomeMessage.classList.remove('hidden');
+                await actions.loadConversations();
+            }
+        },
+        handleConvClick: async (e) => {
+            const convId = parseInt(e.target.dataset.convId);
+            if (!convId) return;
 
-    const handleGitHubImport = () => {
-        alert("GitHub import feature is not yet implemented.");
-        // Logika untuk import dari GitHub akan ditambahkan di sini
+            if (e.target.closest('.delete-btn')) {
+                actions.handleDeleteConversation(convId);
+            } else if (state.currentConvId !== convId) {
+                state.currentConvId = convId;
+                renderConversations();
+                try {
+                    const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
+                    renderChats(chats);
+                } catch (err) {
+                    showToast('Failed to load chats.', 'error');
+                    console.error(err);
+                }
+            }
+        },
     };
-
 
     // --- WEBSOCKET LOGIC ---
     const setupWebSocket = () => {
+        const message = dom.userInput.value.trim();
+        if (!message || !state.currentProjectId || !state.currentConvId) return;
+
         if (state.ws) state.ws.close();
-        if (!state.currentProjectId || !state.currentConvId) return;
+        setLoading(true);
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/ai?project_id=${state.currentProjectId}&conversation_id=${state.currentConvId}`;
@@ -261,47 +306,45 @@ document.addEventListener('DOMContentLoaded', () => {
         let fullResponse = '';
 
         state.ws.onopen = () => {
-            const message = userInput.value.trim();
             appendMessage('user', message);
             state.ws.send(JSON.stringify({ msg: message }));
-            userInput.value = '';
-
-            lastAiMessageElement = document.createElement('div');
-            lastAiMessageElement.className = 'message ai';
-            const thinkingP = document.createElement('p');
-            thinkingP.textContent = 'Thinking...';
-            lastAiMessageElement.appendChild(thinkingP);
-            chatMessages.appendChild(lastAiMessageElement);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            dom.userInput.value = '';
+            autoResizeTextarea();
+            lastAiMessageElement = appendMessage('ai', '');
         };
 
         state.ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
                 if (data.status === 'update') {
-                    const thinkingP = lastAiMessageElement.querySelector('p');
-                    if (thinkingP) thinkingP.textContent = data.message;
+                    dom.aiStatusText.textContent = data.message;
                 } else if (data.status === 'done') {
+                    setLoading(false);
                     processCodeBlocks(lastAiMessageElement);
                     state.ws.close();
+                } else if (data.status === 'error') {
+                     setLoading(false, 'Error');
+                     lastAiMessageElement.innerHTML = `<p class="error-text"><strong>Error:</strong> ${data.message}</p>`;
+                     state.ws.close();
                 }
             } catch (e) {
-                const thinkingP = lastAiMessageElement.querySelector('p');
-                if (thinkingP) thinkingP.remove();
-                
                 fullResponse += event.data;
                 lastAiMessageElement.innerHTML = marked.parse(fullResponse + '█');
+                dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
             }
-            chatMessages.scrollTop = chatMessages.scrollHeight;
         };
 
         state.ws.onclose = () => {
+            setLoading(false);
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = marked.parse(fullResponse);
                 processCodeBlocks(lastAiMessageElement);
             }
         };
+
         state.ws.onerror = (error) => {
+            setLoading(false, 'Error');
+            showToast('WebSocket connection failed.', 'error');
             console.error('WebSocket error:', error);
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = "<p><strong>Error:</strong> Could not connect to the AI service.</p>";
@@ -310,51 +353,25 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- EVENT LISTENERS ---
-    chatForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (userInput.value.trim() && state.currentConvId) {
-            setupWebSocket();
-        }
-    });
-    
-    projectList.addEventListener('click', async (e) => {
-        const target = e.target;
-        if (target.classList.contains('delete-btn')) {
-            handleDeleteProject(parseInt(target.dataset.projectId));
-        } else if (target.closest('.list-item')) {
-            const listItem = target.closest('.list-item');
-            state.currentProjectId = parseInt(listItem.dataset.projectId);
-            state.currentConvId = null; 
-            chatMessages.innerHTML = '';
-            chatMessages.classList.add('hidden');
-            welcomeMessage.classList.remove('hidden');
-            await loadProjects(); // Memuat ulang untuk update kelas 'active'
-            await loadConversations();
+    dom.newProjectBtn.addEventListener('click', actions.handleNewProject);
+    dom.newConvBtn.addEventListener('click', actions.handleNewConversation);
+    dom.chatForm.addEventListener('submit', (e) => { e.preventDefault(); setupWebSocket(); });
+    dom.projectList.addEventListener('click', actions.handleProjectClick);
+    dom.convList.addEventListener('click', actions.handleConvClick);
+    dom.userInput.addEventListener('input', autoResizeTextarea);
+    dom.userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            dom.chatForm.requestSubmit();
         }
     });
 
-    convList.addEventListener('click', async (e) => {
-        const target = e.target;
-        if (target.classList.contains('delete-btn')) {
-            handleDeleteConversation(parseInt(target.dataset.convId));
-        } else if (target.closest('.list-item')) {
-            const listItem = target.closest('.list-item');
-            state.currentConvId = parseInt(listItem.dataset.convId);
-            await loadConversations(); // Memuat ulang untuk update kelas 'active'
-            const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
-            renderChats(chats);
-        }
-    });
-    
-    // --- EVENT LISTENERS BARU ---
-    newProjectBtn.addEventListener('click', handleNewProject);
-    newConvBtn.addEventListener('click', handleNewConversation);
-    webSearchBtn.addEventListener('click', handleWebSearch);
-    importGithubBtn.addEventListener('click', handleGitHubImport);
+    dom.importGithubBtn.addEventListener('click', () => showToast('GitHub Import coming soon!', 'info'));
+    dom.uploadFileBtn.addEventListener('click', () => showToast('File Upload coming soon!', 'info'));
     
     // --- INITIALIZATION ---
-    const init = () => {
-        loadProjects();
+    const init = async () => {
+        await actions.loadProjects();
         renderConversations();
     };
 
