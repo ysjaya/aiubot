@@ -1,19 +1,15 @@
---index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn[standard]
 cerebras-cloud-sdk
-PyGithub
-requests
 sqlmodel
 psycopg2-binary
 python-dotenv
 pydantic-settings
-
-# Tools
+PyGithub
+requests
 beautifulsoup4
 trafilatura
-
-# Dependensi RAG (dengan Torch CPU)
 torch
 sentence-transformers
 faiss-cpu
