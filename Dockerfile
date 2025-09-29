@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir --upgrade pip && pip install -r requirements.txt
 
 # Menyalin seluruh kode aplikasi
 # GANTI BAGIAN INI: Salin seluruh konteks proyek, bukan hanya subdirektori 'app'
-COPY . /app
+COPY . .
 
 # Perintah untuk menjalankan aplikasi
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
