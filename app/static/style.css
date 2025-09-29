@@ -1,69 +1,106 @@
+/* --------------------------------------------------------------
+   GLOBAL VARIABLES & ROOT SETTINGS
+   -------------------------------------------------------------- */
 :root {
-    --sidebar-bg: #1a1c22;
-    --main-bg: #1f2229;
-    --border-color: #363b49;
-    --text-color: #d1d5db;
-    --accent-color: #7c3aed;
-    --card-bg: #292d36;
-    --input-bg: #2d313a;
-    --text-muted: #6b7280;
-    --success-color: #22c55e;
-    --error-color: #ef4444;
+    --sidebar-bg: #ac;
+    --main-bg: #f;
+    --border-color: #b;
+    --text-color: #dddb;
+    --accent-color: #caed;
+    --card-bg: #d;
+    --input-bg: #da;
+    --text-muted: #b;
+    --success-color: #ce;
+    --error-color: #ef;
+    --pico-border-radius: .rem;          /* [ROBUSTNESS] default radius */
+    --touch-target-min: px;               /* [MOBILE] minimum touch area */
+    --input-padding-right: .rem;         /* room for send button */
 }
 
-html, body {
-    height: 100dvh; /* Gunakan dvh untuk mobile */
+/* --------------------------------------------------------------
+   BASE STYLES
+   -------------------------------------------------------------- */
+html,
+body {
+    /* [ROBUSTNESS] fallback for browsers without dvh support */
+    height: vh;
+    height: dvh;
     overflow: hidden;
     color: var(--text-color);
     background-color: var(--main-bg);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 Roboto, Helvetica, Arial, sans-serif;
+    color-scheme: dark;                    /* enable dark mode */
 }
 
+/* --------------------------------------------------------------
+   LAYOUT CONTAINER
+   -------------------------------------------------------------- */
 #app-container {
     display: flex;
-    height: 100%;
+    height: %;
     position: relative;
 }
 
-/* --- Sidebars --- */
-#sidebar-left, #sidebar-right {
+/* --------------------------------------------------------------
+   SIDEBARS (LEFT & RIGHT)
+   -------------------------------------------------------------- */
+#sidebar-left,
+#sidebar-right {
     display: flex;
     flex-direction: column;
     background-color: var(--sidebar-bg);
-    border-right: 1px solid var(--border-color);
-    padding: 1rem;
+    border-right: px solid var(--border-color);
+    padding: rem;
     overflow-y: auto;
-    transition: transform 0.3s ease-in-out;
-    z-index: 20;
+    transition: transform .s ease-in-out;
+    z-index: ;
 }
-#sidebar-left { width: 280px; flex-shrink: 0; }
-#sidebar-right { width: 320px; border-left: 1px solid var(--border-color); border-right: none; flex-shrink: 0; }
+#sidebar-left { width: px; flex-shrink: ; }
+#sidebar-right {
+    width: px;
+    border-left: px solid var(--border-color);
+    border-right: none;
+    flex-shrink: ;
+}
 
+/* --------------------------------------------------------------
+   SIDEBAR HEADER
+   -------------------------------------------------------------- */
 .sidebar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    margin-bottom: rem;
+    padding-bottom: .rem;
+    border-bottom: px solid var(--border-color);
 }
-.sidebar-header h3 { margin: 0; font-size: 1rem; }
-.sidebar-header .fas, .sidebar-header .fab { margin-right: 0.5rem; }
+.sidebar-header h {
+    margin: ;
+    font-size: clamp(.rem, vw, rem);
+}
+.sidebar-header .fas,
+.sidebar-header .fab {
+    margin-right: .rem;
+}
 
-.list-container { flex-grow: 1; }
+/* --------------------------------------------------------------
+   LIST ITEMS
+   -------------------------------------------------------------- */
+.list-container { flex-grow: ; }
 
 .list-item-container {
     display: flex;
     align-items: center;
     border-radius: var(--pico-border-radius);
-    margin-bottom: 0.25rem;
-    transition: background-color 0.2s ease;
+    margin-bottom: .rem;
+    transition: background-color .s ease;
 }
 .list-item-container:hover { background-color: var(--card-bg); }
 
 .list-item {
-    flex-grow: 1;
-    padding: 0.6rem 0.8rem;
+    flex-grow: ;
+    padding: .rem .rem;
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
@@ -71,142 +108,361 @@ html, body {
 }
 .list-item.active {
     background-color: var(--accent-color);
-    color: white;
-    font-weight: 600;
+    color: #fff;
+    font-weight: ;
 }
 
-.delete-btn { visibility: hidden; opacity: 0.6; }
+/* --------------------------------------------------------------
+   DELETE BUTTON (visible on hover)
+   -------------------------------------------------------------- */
+.delete-btn {
+    visibility: hidden;
+    opacity: .;
+}
 .list-item-container:hover .delete-btn { visibility: visible; }
-.delete-btn:hover { opacity: 1; color: var(--error-color); }
+.delete-btn:hover {
+    opacity: ;
+    color: var(--error-color);
+}
 
+/* --------------------------------------------------------------
+   ICON BUTTONS (generic)
+   -------------------------------------------------------------- */
 .icon-btn {
     background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
+    padding: .rem;
+    border-radius: %;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
     display: inline-flex;
     justify-content: center;
     align-items: center;
+    transition: background-color .s ease, color .s ease;
 }
-.icon-btn:hover { background-color: var(--card-bg); color: var(--text-color); }
+.icon-btn:hover {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+.icon-btn:focus-visible {                     /* [ACC] focus styling */
+    outline: px solid var(--accent-color);
+    outline-offset: px;
+}
 
-/* --- Main Content --- */
+/* --------------------------------------------------------------
+   MAIN CONTENT AREA
+   -------------------------------------------------------------- */
 #main-content {
-    flex: 1;
+    flex: ;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    min-width: 0;
+    height: %;
+    min-width: ;               /* prevents overflow */
 }
 
+/* --------------------------------------------------------------
+   CHAT WINDOW
+   -------------------------------------------------------------- */
 #chat-window {
-    flex-grow: 1;
+    flex-grow: ;
     overflow-y: auto;
-    padding: 1rem 2rem;
+    padding: rem rem;
+    scroll-behavior: smooth;
 }
 #welcome-message {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100%;
+    height: %;
     text-align: center;
     color: var(--text-muted);
 }
-.welcome-icon { font-size: 4rem; margin-bottom: 1rem; }
+.welcome-icon {
+    font-size: rem;
+    margin-bottom: rem;
+}
 #chat-messages.hidden { display: none; }
 
+/* --------------------------------------------------------------
+   MESSAGE BUBBLES
+   -------------------------------------------------------------- */
 .message {
-    max-width: 90%;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
+    max-width: %;
+    padding: rem;
+    margin-bottom: .rem;
     border-radius: var(--pico-border-radius);
-    line-height: 1.6;
+    line-height: .;
     word-wrap: break-word;
 }
-.message.user { background-color: var(--card-bg); margin-left: auto; }
-.message.ai { background-color: transparent; border: 1px solid var(--border-color); margin-right: auto; }
-.message pre { padding: 1rem; background-color: #0d1117; border-radius: var(--pico-border-radius); border: 1px solid var(--border-color); white-space: pre-wrap; }
-.code-block-wrapper { position: relative; margin: 1rem 0; }
-.code-toolbar { position: absolute; top: 0.5rem; right: 0.5rem; opacity: 0; transition: opacity 0.2s ease-in-out; }
-.code-block-wrapper:hover .code-toolbar { opacity: 1; }
-.code-toolbar button { padding: 0.25rem 0.5rem; font-size: 0.75rem; background-color: var(--main-bg); border: 1px solid var(--border-color); color: var(--text-color); cursor: pointer; border-radius: var(--pico-border-radius); }
-.code-toolbar button:hover { background-color: var(--accent-color); color: white; }
-
-/* --- Chat Input Area --- */
-#chat-input-area { 
-    padding: 1rem 2rem; 
-    border-top: 1px solid var(--border-color); 
-    background-color: var(--sidebar-bg);
-    flex-shrink: 0; /* Mencegah area input menyusut */
+.message.user {
+    background-color: var(--card-bg);
+    margin-left: auto;
 }
-#status-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; height: 20px; }
+.message.ai {
+    background-color: transparent;
+    border: px solid var(--border-color);
+    margin-right: auto;
+}
 
-/* --- PERBAIKAN DI SINI --- */
-.input-wrapper {
+/* --------------------------------------------------------------
+   CODE BLOCKS
+   -------------------------------------------------------------- */
+.message pre {
+    padding: rem;
+    background-color: #d;
+    border-radius: var(--pico-border-radius);
+    border: px solid var(--border-color);
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-size: clamp(.rem, .vw, .rem);
+}
+.code-block-wrapper {
+    position: relative;
+    margin: rem ;
+}
+.code-toolbar {
+    position: absolute;
+    top: .rem;
+    right: .rem;
+    opacity: ;
+    transition: opacity .s ease-in-out;
+    display: flex;
+    gap: .rem;
+}
+.code-block-wrapper:hover .code-toolbar { opacity: ; }
+.code-toolbar button {
+    padding: .rem .rem;
+    font-size: .rem;
+    background-color: var(--main-bg);
+    border: px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    border-radius: var(--pico-border-radius);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+}
+.code-toolbar button:hover {
+    background-color: var(--accent-color);
+    color: #fff;
+}
+.code-toolbar button:focus-visible {
+    outline: px solid var(--accent-color);
+    outline-offset: px;
+}
+
+/* --------------------------------------------------------------
+   CHAT INPUT AREA (refactored)
+   -------------------------------------------------------------- */
+#chat-input-area {
+    padding: rem rem;
+    border-top: px solid var(--border-color);
+    background-color: var(--sidebar-bg);
+    flex-shrink: ;
+}
+#status-bar {
+    display: flex;
+    align-items: center;
+    gap: .rem;
+    font-size: clamp(.rem, .vw, .rem);
+    color: var(--text-muted);
+    margin-bottom: .rem;
+    height: px;
+}
+
+/* --------------------------------------------------------------
+   INPUT WRAPPER (flex layout)
+   -------------------------------------------------------------- */
+.input-wrapper {                               /* [MOBILE] Input area with safe‑area support */
     position: relative;
     display: flex;
-    align-items: flex-end; /* Tombol akan menempel di bawah */
+    align-items: flex-end;
 }
-#user-input { 
-    width: 100%; 
-    border-radius: var(--pico-border-radius); 
-    background-color: var(--input-bg); 
-    border-color: var(--border-color); 
-    resize: none; 
-    padding: 0.75rem 3.5rem 0.75rem 1rem; /* Beri ruang lebih di kanan */
-    max-height: 200px; 
-    overflow-y: auto; 
+
+/* --------------------------------------------------------------
+   TEXTAREA INPUT
+   -------------------------------------------------------------- */
+#user-input {
+    width: %;
+    border-radius: var(--pico-border-radius);
+    background-color: var(--input-bg);
+    border: px solid var(--border-color);
+    resize: none;
+    padding: .rem var(--input-padding-right) .rem rem;
+    max-height: px;
+    overflow-y: auto;
+    font-size: clamp(.rem, vw, rem);
+    color: var(--text-color);
 }
-#send-btn { 
-    position: absolute; 
-    right: 0.5rem; 
-    bottom: 0.5rem; /* Menempel 0.5rem dari bawah wrapper */
+#user-input:focus-visible {                     /* [ACC] focus styling */
+    outline: px solid var(--accent-color);
+    outline-offset: -px;
 }
-/* --- AKHIR PERBAIKAN --- */
 
+/* --------------------------------------------------------------
+   SEND BUTTON (absolute inside flex wrapper)
+   -------------------------------------------------------------- */
+#send-btn {
+    position: absolute;
+    right: .rem;
+    bottom: .rem;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    border-radius: %;
+    background-color: var(--accent-color);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color .s ease;
+}
+#send-btn:hover { background-color: #dd; }
+#send-btn:focus-visible {                       /* [ACC] focus styling */
+    outline: px solid #fff;
+    outline-offset: px;
+}
+#send-btn svg {
+    width: px;
+    height: px;
+}
 
-/* --- Spinner --- */
-.spinner { border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+/* --------------------------------------------------------------
+   SPINNER (loading indicator)
+   -------------------------------------------------------------- */
+.spinner {
+    border: px solid var(--border-color);
+    border-top: px solid var(--accent-color);
+    border-radius: %;
+    width: px;
+    height: px;
+    animation: spin s linear infinite;
+}
+@keyframes spin {
+    %   { transform: rotate(deg); }
+    % { transform: rotate(deg); }
+}
 
-/* --- Toast Notification --- */
-#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 1rem 1.5rem; border-radius: var(--pico-border-radius); color: white; opacity: 0; transition: opacity 0.3s ease, bottom 0.3s ease; z-index: 1000; }
-#toast.show { opacity: 1; bottom: 30px; }
+/* --------------------------------------------------------------
+   TOAST NOTIFICATION
+   -------------------------------------------------------------- */
+#toast {
+    position: fixed;
+    bottom: px;
+    left: %;
+    transform: translateX(-%);
+    padding: rem .rem;
+    border-radius: var(--pico-border-radius);
+    color: #fff;
+    opacity: ;
+    transition: opacity .s ease, bottom .s ease;
+    z-index: ;
+    max-width: %;
+    text-align: center;
+    font-size: clamp(.rem, vw, rem);
+}
+#toast.show { opacity: ; bottom: px; }
 #toast.success { background-color: var(--success-color); }
-#toast.error { background-color: var(--error-color); }
+#toast.error   { background-color: var(--error-color); }
 
 .hidden { display: none !important; }
 
-/* --- Mobile Header & Overlay --- */
-#mobile-header { display: none; }
-#mobile-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 15; }
+/* --------------------------------------------------------------
+   MOBILE HEADER & OVERLAY
+   -------------------------------------------------------------- */
+#mobile-header {
+    display: none;                               /* shown only on mobile */
+    justify-content: space-between;
+    align-items: center;
+    padding: .rem rem;
+    border-bottom: px solid var(--border-color);
+    background-color: var(--sidebar-bg);
+    height: px;
+}
+.mobile-title {
+    font-weight: bold;
+    font-size: clamp(rem, vw, .rem);
+}
+.mobile-menu-btn {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+}
 
-/* --- MOBILE RESPONSIVE STYLES --- */
-@media (max-width: 768px) {
-    #sidebar-left, #sidebar-right {
+/* Overlay that appears when a sidebar is open */
+#mobile-overlay {
+    position: fixed;
+    top: ; left: ; right: ; bottom: ;
+    background-color: rgba(,,,.);
+    z-index: ;
+    opacity: ;
+    visibility: hidden;
+    transition: opacity .s ease, visibility .s ease;
+}
+#mobile-overlay.open {
+    opacity: ;
+    visibility: visible;
+}
+
+/* --------------------------------------------------------------
+   RESPONSIVE STYLES (tablet & mobile)
+   -------------------------------------------------------------- */
+@media (max-width: px) {
+    /* Sidebar behavior on small screens */
+    #sidebar-left,
+    #sidebar-right {
         position: absolute;
-        top: 0;
-        bottom: 0;
-        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        top: ;
+        bottom: ;
+        box-shadow:   px rgba(,,,.);
     }
-    #sidebar-left { transform: translateX(-100%); }
-    #sidebar-right { right: 0; transform: translateX(100%); }
-    #sidebar-left.open, #sidebar-right.open { transform: translateX(0); }
-    
-    #chat-window, #chat-input-area { padding: 1rem; }
+    #sidebar-left { transform: translateX(-%); }
+    #sidebar-right { right: ; transform: translateX(%); }
+    #sidebar-left.open,
+    #sidebar-right.open { transform: translateX(); }
 
-    #mobile-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 1rem;
-        border-bottom: 1px solid var(--border-color);
-        background-color: var(--sidebar-bg);
+    /* Reduce padding for chat window & input area */
+    #chat-window,
+    #chat-input-area {
+        padding: rem;
     }
-    .mobile-title { font-weight: bold; }
+
+    /* Safe‑area padding for iOS home indicator */
+    #chat-input-area {
+        padding-bottom: calc(rem + env(safe-area-inset-bottom));
     }
+
+    /* Larger touch targets & font size */
+    #user-input {
+        padding: rem calc(var(--input-padding-right) + .rem) rem .rem;
+        font-size: rem;
+    }
+    #send-btn {
+        width: px;
+        height: px;
+        bottom: rem;
+    }
+
+    /* Show mobile header */
+    #mobile-header { display: flex; }
+}
+
+/* --------------------------------------------------------------
+   PREFER REDUCED MOTION
+   -------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count:  !important;
+        transition-duration: .01ms !important;
+    }
+        }
+        
