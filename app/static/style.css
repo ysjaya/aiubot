@@ -209,4 +209,22 @@ html, body {
         background-color: var(--sidebar-bg);
     }
     .mobile-title { font-weight: bold; }
+}
+    #sidebar-left  { transform:translateX(-100%); }
+    #sidebar-right { right:0; transform:translateX(100%); }
+    #sidebar-left.open,
+    #sidebar-right.open { transform:translateX(0); }
+
+    #chat-window,
+    #chat-input-area { padding:1rem; }
+
+    #mobile-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        padding:.5rem 1rem;
+        border-bottom:1px solid var(--border-color);
+        background-color:var(--sidebar-bg);
     }
+    .mobile-title { font-weight:bold; }
+}
