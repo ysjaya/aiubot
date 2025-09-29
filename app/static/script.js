@@ -253,12 +253,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         handleProjectClick: async (e) => {
-            const projectId = parseInt(e.target.dataset.projectId);
-            if (!projectId) return;
+            const projectContainer = e.target.closest('.list-item');
+            if (!projectContainer) {
+                // Check if delete button was clicked inside the container
+                const deleteButton = e.target.closest('.delete-btn');
+                if(deleteButton) {
+                    actions.handleDeleteProject(parseInt(deleteButton.dataset.projectId));
+                }
+                return;
+            }
+            const projectId = parseInt(projectContainer.dataset.projectId);
+            if (!projectId || isNaN(projectId)) return;
 
-            if (e.target.closest('.delete-btn')) {
-                actions.handleDeleteProject(projectId);
-            } else if (state.currentProjectId !== projectId) {
+            if (state.currentProjectId !== projectId) {
                 state.currentProjectId = projectId;
                 state.currentConvId = null;
                 state.conversations = [];
@@ -271,12 +278,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         handleConvClick: async (e) => {
-            const convId = parseInt(e.target.dataset.convId);
-            if (!convId) return;
+            const convContainer = e.target.closest('.list-item');
+            if (!convContainer) {
+                 const deleteButton = e.target.closest('.delete-btn');
+                if(deleteButton) {
+                    actions.handleDeleteConversation(parseInt(deleteButton.dataset.convId));
+                }
+                return;
+            }
+            const convId = parseInt(convContainer.dataset.convId);
+            if (!convId || isNaN(convId)) return;
 
-            if (e.target.closest('.delete-btn')) {
-                actions.handleDeleteConversation(convId);
-            } else if (state.currentConvId !== convId) {
+            if (state.currentConvId !== convId) {
                 state.currentConvId = convId;
                 renderConversations();
                 try {
@@ -293,27 +306,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- WEBSOCKET LOGIC ---
     const setupWebSocket = () => {
         const message = dom.userInput.value.trim();
-        if (!message || !state.currentProjectId || !state.currentConvId) return;
+        if (!message || !state.currentProjectId || !state.currentConvId) {
+            console.log('DEBUG: WebSocket setup aborted. Missing message or IDs.');
+            if(!message) showToast("Please type a message first.", "error");
+            if(!state.currentConvId) showToast("Please select a conversation first.", "error");
+            return;
+        }
 
         if (state.ws) state.ws.close();
         setLoading(true);
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/ai?project_id=${state.currentProjectId}&conversation_id=${state.currentConvId}`;
+        console.log('DEBUG: Connecting to WebSocket:', wsUrl); // LOG 1
         state.ws = new WebSocket(wsUrl);
 
         let lastAiMessageElement = null;
         let fullResponse = '';
 
         state.ws.onopen = () => {
+            console.log('DEBUG: WebSocket connection opened.'); // LOG 2
             appendMessage('user', message);
-            state.ws.send(JSON.stringify({ msg: message }));
+            const payload = JSON.stringify({ msg: message });
+            console.log('DEBUG: Sending message:', payload); // LOG 3
+            state.ws.send(payload);
             dom.userInput.value = '';
             autoResizeTextarea();
             lastAiMessageElement = appendMessage('ai', '');
         };
 
         state.ws.onmessage = (event) => {
+            console.log('DEBUG: WebSocket message received:', event.data); // LOG 4
             try {
                 const data = JSON.parse(event.data);
                 if (data.status === 'update') {
@@ -324,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.ws.close();
                 } else if (data.status === 'error') {
                      setLoading(false, 'Error');
-                     lastAiMessageElement.innerHTML = `<p class="error-text"><strong>Error:</strong> ${data.message}</p>`;
+                     lastAiMessageElement.innerHTML = `<p style="color:var(--error-color);"><strong>Error:</strong> ${data.message}</p>`;
                      state.ws.close();
                 }
             } catch (e) {
@@ -334,7 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        state.ws.onclose = () => {
+        state.ws.onclose = (event) => {
+            console.log('DEBUG: WebSocket connection closed.', event); // LOG 5
             setLoading(false);
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = marked.parse(fullResponse);
@@ -345,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.ws.onerror = (error) => {
             setLoading(false, 'Error');
             showToast('WebSocket connection failed.', 'error');
-            console.error('WebSocket error:', error);
+            console.error('WebSocket error:', error); // LOG 6
             if (lastAiMessageElement) {
                 lastAiMessageElement.innerHTML = "<p><strong>Error:</strong> Could not connect to the AI service.</p>";
             }
