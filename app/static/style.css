@@ -32,9 +32,10 @@ html, body {
     border-right: 1px solid var(--border-color);
     padding: 1rem;
     overflow-y: auto;
+    transition: transform 0.3s ease;
 }
-#sidebar-left { width: 280px; }
-#sidebar-right { width: 320px; border-left: 1px solid var(--border-color); border-right: none; }
+#sidebar-left { width: 280px; flex-shrink: 0; }
+#sidebar-right { width: 320px; border-left: 1px solid var(--border-color); border-right: none; flex-shrink: 0; }
 
 .sidebar-header {
     display: flex;
@@ -47,9 +48,7 @@ html, body {
 .sidebar-header h3 { margin: 0; font-size: 1rem; }
 .sidebar-header .fas, .sidebar-header .fab { margin-right: 0.5rem; }
 
-.list-container {
-    flex-grow: 1;
-}
+.list-container { flex-grow: 1; }
 
 .list-item-container {
     display: flex;
@@ -74,10 +73,7 @@ html, body {
     font-weight: 600;
 }
 
-.delete-btn {
-    visibility: hidden;
-    opacity: 0.6;
-}
+.delete-btn { visibility: hidden; opacity: 0.6; }
 .list-item-container:hover .delete-btn { visibility: visible; }
 .delete-btn:hover { opacity: 1; color: var(--error-color); }
 
@@ -102,6 +98,7 @@ html, body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    min-width: 0; /* Important for flexbox shrinking */
 }
 
 #chat-window {
@@ -127,6 +124,7 @@ html, body {
     margin-bottom: 1.5rem;
     border-radius: var(--pico-border-radius);
     line-height: 1.6;
+    word-wrap: break-word;
 }
 .message.user {
     background-color: var(--card-bg);
@@ -143,7 +141,6 @@ html, body {
     border-radius: var(--pico-border-radius);
     border: 1px solid var(--border-color);
     white-space: pre-wrap;
-    word-wrap: break-word;
 }
 .code-block-wrapper { position: relative; margin: 1rem 0; }
 .code-toolbar {
@@ -195,10 +192,7 @@ html, body {
     max-height: 200px;
     overflow-y: auto;
 }
-#send-btn {
-    position: absolute;
-    right: 0.5rem;
-}
+#send-btn { position: absolute; right: 0.5rem; }
 
 /* --- Spinner --- */
 .spinner {
@@ -229,3 +223,29 @@ html, body {
 #toast.error { background-color: var(--error-color); }
 
 .hidden { display: none !important; }
+
+/* --- MOBILE RESPONSIVE STYLES --- */
+@media (max-width: 768px) {
+    #sidebar-left, #sidebar-right {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        z-index: 20;
+        transform: translateX(-100%);
+    }
+    #sidebar-right {
+        transform: translateX(100%);
+        left: auto;
+        right: 0;
+    }
+    #sidebar-left.open, #sidebar-right.open {
+        transform: translateX(0);
+    }
+    
+    #chat-window, #chat-input-area {
+        padding: 1rem;
+    }
+
+    /* Anda perlu menambahkan tombol untuk membuka/menutup sidebar ini di HTML Anda */
+    /* Misalnya: <button id="toggle-left-sidebar">Menu</button> */
+    }
