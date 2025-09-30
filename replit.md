@@ -10,7 +10,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (September 30, 2025)
 
-### Replit Environment Setup (Latest)
+### Replit Environment Setup (Latest - September 30, 2025)
 - **Development Configuration**: Successfully configured for Replit environment
   - Python 3.11 and Node.js 20 toolchains installed
   - PostgreSQL database created and initialized
@@ -18,18 +18,26 @@ Preferred communication style: Simple, everyday language.
   - Frontend configured on port 5000 with proper host settings (0.0.0.0, allowedHosts: true)
   - Backend running on localhost:8000
   - Fixed case-sensitive import issue (App.jsx → app.jsx)
+  - Fixed API connection issue: Changed API_URL from localhost to relative path for Replit proxy compatibility
 
 - **Workflow Setup**: 
   - Single "Dev Server" workflow running both backend and frontend
   - Backend starts first on port 8000
   - Frontend starts on port 5000 and proxies API calls to backend
   - Automatic database migration on startup
+  - All features tested and working: Project management, AI chat, file versioning
 
 - **Deployment Configuration**:
   - Autoscale deployment target configured
   - Build step: Installs and builds frontend
   - Run step: Serves production app with FastAPI + built React frontend
   - Production serves from frontend/dist with fallback to vanilla templates
+
+- **Bug Fixes Applied**:
+  - Fixed frontend API connection by using relative URLs instead of absolute localhost URLs
+  - Configured Vite proxy to work correctly with Replit environment
+  - Updated .env file to use empty API_URL for same-origin requests
+  - Backend properly serves both development and production frontend builds
 
 ## Recent Changes (September 30, 2025)
 
