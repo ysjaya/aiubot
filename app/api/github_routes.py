@@ -25,7 +25,7 @@ class GitHubRepoListRequest(BaseModel):
 
 # ==================== GITHUB ROUTES ====================
 
-@router.get("/github/repos")
+@router.get("/repos")
 async def list_github_repos(
     github_token: str = Depends(get_github_token)
 ):
@@ -37,7 +37,7 @@ async def list_github_repos(
         logger.error(f"Failed to list repos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/github/repo/{owner}/{repo}/files")
+@router.get("/repo/{owner}/{repo}/files")
 async def list_repo_files(
     owner: str,
     repo: str,
@@ -65,7 +65,7 @@ async def list_repo_files(
         logger.error(f"Failed to list repo files: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/github/import")
+@router.post("/import")
 async def import_files_from_github(
     request: GitHubImportRequest,
     github_token: str = Depends(get_github_token),
@@ -146,7 +146,7 @@ async def import_files_from_github(
         logger.error(f"Failed to import files: {e}")
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
-@router.get("/github/repo/{owner}/{repo}/import-preview")
+@router.get("/repo/{owner}/{repo}/import-preview")
 async def preview_repo_import(
     owner: str,
     repo: str,
@@ -184,7 +184,7 @@ async def preview_repo_import(
         logger.error(f"Failed to preview import: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/github/import-all/{owner}/{repo}")
+@router.post("/import-all/{owner}/{repo}")
 async def import_all_from_repo(
     owner: str,
     repo: str,
