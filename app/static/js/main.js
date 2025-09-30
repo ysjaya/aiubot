@@ -4,7 +4,7 @@ import { setupWebSocket } from './websocket.js';
 import { autoResizeTextarea, closeSidebars } from './ui.js';
 import { checkAuth } from './auth.js';
 
-// Project & Conversation Actions
+// Project & Conversation
 dom.newProjectBtn.addEventListener('click', actions.handleNewProject);
 dom.newConvBtn.addEventListener('click', actions.handleNewConversation);
 
@@ -36,23 +36,16 @@ dom.importGithubBtn.addEventListener('click', actions.handleGitHubImportClick);
 
 // Modal
 dom.modalCloseBtn.addEventListener('click', () => dom.githubModal.close());
-dom.modalContent.addEventListener('click', (e) => {
-    if (e.target.classList.contains('github-repo-list-item')) {
-        actions.handleRepoSelect(e.target.dataset.repoFullname);
-    } else if (e.target.classList.contains('github-file-list-item')) {
-        actions.handleFileImport(e.target.dataset.filePath);
-    }
-});
 
 // Mobile Sidebars
-dom.toggleLeftSidebarBtn.addEventListener('click', (e) => {
+dom.toggleLeftSidebarBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     closeSidebars();
     dom.sidebarLeft.classList.add('open');
     dom.mobileOverlay.classList.remove('hidden');
 });
 
-dom.toggleRightSidebarBtn.addEventListener('click', (e) => {
+dom.toggleRightSidebarBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     closeSidebars();
     dom.sidebarRight.classList.add('open');
