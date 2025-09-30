@@ -175,35 +175,131 @@ export const actions = {
         closeSidebars();
     },
 
-    handleFileAttach: async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
+    handleGitHubImport: async () => {
+        // Auto-create project and conversation if needed
+        if (!state.currentProjectId) {
+            try {
+                const project = await api.post(`/project?name=${encodeURIComponent('GitHub Import ' + new Date().toLocaleDateString())}`);
+                state.currentProjectId = project.id;
+                await actions.loadProjects();
+            } catch (err) {
+                showToast('Failed to create project', 'error');
+                return;
+            }
+        }
         
         if (!state.currentConvId) {
-            showToast('Select a conversation first', 'error');
-            return;
+            try {
+                const conv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent('GitHub Import ' + new Date().toLocaleTimeString())}`);
+                state.currentConvId = conv.id;
+                await actions.loadConversations();
+            } catch (err) {
+                showToast('Failed to create conversation', 'error');
+                return;
+            }
         }
         
-        if (file.size > 1_000_000) {
-            showToast('File too large (max 1MB)', 'error');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('file', file);
+        // Show modal and load repos
+        dom.githubModal.showModal();
+        document.getElementById('github-step-1').classList.remove('hidden');
+        document.getElementById('github-step-2').classList.add('hidden');
         
         try {
-            await fetch(`/api/conversation/${state.currentConvId}/attach`, {
-                method: 'POST',
-                body: formData
+            const response = await api.get('/github/repos');
+            const repos = response.repos || [];
+            
+            if (repos.length === 0) {
+                document.getElementById('repo-list-container').innerHTML = '<p>No repositories found. Please connect GitHub in the integrations panel.</p>';
+                return;
+            }
+            
+            let html = '<div class="repo-list">';
+            repos.forEach(repo => {
+                html += `
+                    <div class="repo-item" data-repo="${repo.full_name}">
+                        <div class="repo-info">
+                            <div class="repo-name">${repo.name}</div>
+                            <div class="repo-desc">${repo.description || 'No description'}</div>
+                            <div class="repo-meta">
+                                ${repo.language ? `<span class="badge">${repo.language}</span>` : ''}
+                                <span><i class="fas fa-star"></i> ${repo.stars}</span>
+                                ${repo.private ? '<span class="badge private">Private</span>' : ''}
+                            </div>
+                        </div>
+                        <button class="btn-small select-repo-btn" data-repo="${repo.full_name}">
+                            <i class="fas fa-arrow-right"></i> Select
+                        </button>
+                    </div>
+                `;
             });
-            showToast(`📎 Attached: ${file.name}`);
-            await actions.loadAttachments();
+            html += '</div>';
+            
+            document.getElementById('repo-list-container').innerHTML = html;
+            
+            // Add click handlers for repo selection
+            document.querySelectorAll('.select-repo-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const repoFullName = e.target.closest('.select-repo-btn').dataset.repo;
+                    await actions.selectRepoForImport(repoFullName);
+                });
+            });
+            
         } catch (err) {
-            showToast('Failed to attach file', 'error');
+            document.getElementById('repo-list-container').innerHTML = '<p class="error">Failed to load repositories. Make sure GitHub is connected.</p>';
+            showToast('Failed to load repositories', 'error');
         }
+    },
+    
+    selectRepoForImport: async (repoFullName) => {
+        const [owner, repo] = repoFullName.split('/');
         
-        event.target.value = '';
+        document.getElementById('github-step-1').classList.add('hidden');
+        document.getElementById('github-step-2').classList.remove('hidden');
+        
+        try {
+            const response = await api.get(`/github/repo/${owner}/${repo}/files`);
+            const files = response.importable || [];
+            
+            if (files.length === 0) {
+                document.getElementById('file-selection-container').innerHTML = '<p>No importable files found in this repository.</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="file-import-summary">
+                    <p><strong>${files.length}</strong> importable files found</p>
+                    <button class="btn-small" id="select-all-files-btn">Select All</button>
+                </div>
+                <div class="file-selection-list">
+            `;
+            
+            files.forEach(file => {
+                html += `
+                    <label class="file-checkbox-item">
+                        <input type="checkbox" class="file-checkbox" value="${file.path}" checked>
+                        <span class="file-path">${file.path}</span>
+                        <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+                    </label>
+                `;
+            });
+            
+            html += '</div>';
+            document.getElementById('file-selection-container').innerHTML = html;
+            
+            // Store repo info for import
+            window.currentRepoImport = { repoFullName, files };
+            
+            // Select all handler
+            document.getElementById('select-all-files-btn')?.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.file-checkbox');
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                checkboxes.forEach(cb => cb.checked = !allChecked);
+            });
+            
+        } catch (err) {
+            document.getElementById('file-selection-container').innerHTML = '<p class="error">Failed to load files from repository.</p>';
+            showToast('Failed to load files', 'error');
+        }
     },
 
     handleDeleteAttachment: async (fileId) => {
@@ -275,6 +371,42 @@ export const actions = {
         } catch (err) {
             showToast('Failed to load versions', 'error');
         }
+    },
+    
+    handleImportSelectedFiles: async () => {
+        if (!window.currentRepoImport) {
+            showToast('No repository selected', 'error');
+            return;
+        }
+        
+        const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+        const selectedPaths = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (selectedPaths.length === 0) {
+            showToast('No files selected', 'error');
+            return;
+        }
+        
+        try {
+            const response = await api.post('/github/import', {
+                repo_fullname: window.currentRepoImport.repoFullName,
+                file_paths: selectedPaths,
+                conversation_id: state.currentConvId,
+                project_id: state.currentProjectId
+            });
+            
+            showToast(`✅ Imported ${response.imported_count} files from GitHub`);
+            dom.githubModal.close();
+            await actions.loadAttachments();
+            
+        } catch (err) {
+            showToast('Failed to import files', 'error');
+        }
+    },
+    
+    handleBackToRepos: () => {
+        document.getElementById('github-step-1').classList.remove('hidden');
+        document.getElementById('github-step-2').classList.add('hidden');
     }
 };
 

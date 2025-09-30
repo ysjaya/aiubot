@@ -6,7 +6,7 @@ import logging
 import json
 from datetime import datetime
 
-from app.db.database import get_session, get_project_session
+from app.db.database import get_session
 from app.db import models
 from app.services import github_import
 from app.api.routers import get_github_token
@@ -79,10 +79,9 @@ async def import_files_from_github(
         raise HTTPException(status_code=404, detail="Project not found")
     
     # Verify conversation exists
-    with next(get_project_session(project.database_name)) as proj_session:
-        conv = proj_session.get(models.Conversation, request.conversation_id)
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
+    conv = session.get(models.Conversation, request.conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     
     try:
         # Import files from GitHub
@@ -98,35 +97,34 @@ async def import_files_from_github(
             raise HTTPException(status_code=400, detail="No files could be imported")
         
         # Save as attachments
-        with next(get_project_session(project.database_name)) as proj_session:
-            attachments = []
+        attachments = []
+        
+        for file_data in imported_files:
+            attachment = models.Attachment(
+                conversation_id=request.conversation_id,
+                filename=file_data['path'].split('/')[-1],
+                original_filename=file_data['path'],
+                content=file_data['content'],
+                mime_type="text/plain",
+                size_bytes=file_data['size'],
+                status=models.FileStatus.ORIGINAL,
+                version=1,
+                import_source="github",
+                import_metadata=json.dumps({
+                    **file_data['metadata'],
+                    'sha': file_data['sha'],
+                    'full_path': file_data['path']
+                })
+            )
             
-            for file_data in imported_files:
-                attachment = models.Attachment(
-                    conversation_id=request.conversation_id,
-                    filename=file_data['path'].split('/')[-1],
-                    original_filename=file_data['path'],
-                    content=file_data['content'],
-                    mime_type="text/plain",
-                    size_bytes=file_data['size'],
-                    status=models.FileStatus.ORIGINAL,
-                    version=1,
-                    import_source="github",
-                    import_metadata=json.dumps({
-                        **file_data['metadata'],
-                        'sha': file_data['sha'],
-                        'full_path': file_data['path']
-                    })
-                )
-                
-                proj_session.add(attachment)
-                attachments.append(attachment)
-            
-            proj_session.commit()
-            
-            # Refresh to get IDs
-            for att in attachments:
-                proj_session.refresh(att)
+            session.add(attachment)
+            attachments.append(attachment)
+        
+        session.commit()
+        
+        # Refresh to get IDs
+        for att in attachments:
+            session.refresh(att)
         
         logger.info(f"Successfully imported {len(attachments)} files")
         
@@ -212,30 +210,29 @@ async def import_all_from_repo(
             raise HTTPException(status_code=400, detail="No importable files found")
         
         # Save as attachments
-        with next(get_project_session(project.database_name)) as proj_session:
-            attachments = []
+        attachments = []
+        
+        for file_data in imported_files:
+            attachment = models.Attachment(
+                conversation_id=conversation_id,
+                filename=file_data['path'].split('/')[-1],
+                original_filename=file_data['path'],
+                content=file_data['content'],
+                mime_type="text/plain",
+                size_bytes=file_data['size'],
+                status=models.FileStatus.ORIGINAL,
+                version=1,
+                import_source="github",
+                import_metadata=json.dumps(file_data['metadata'])
+            )
             
-            for file_data in imported_files:
-                attachment = models.Attachment(
-                    conversation_id=conversation_id,
-                    filename=file_data['path'].split('/')[-1],
-                    original_filename=file_data['path'],
-                    content=file_data['content'],
-                    mime_type="text/plain",
-                    size_bytes=file_data['size'],
-                    status=models.FileStatus.ORIGINAL,
-                    version=1,
-                    import_source="github",
-                    import_metadata=json.dumps(file_data['metadata'])
-                )
-                
-                proj_session.add(attachment)
-                attachments.append(attachment)
-            
-            proj_session.commit()
-            
-            for att in attachments:
-                proj_session.refresh(att)
+            session.add(attachment)
+            attachments.append(attachment)
+        
+        session.commit()
+        
+        for att in attachments:
+            session.refresh(att)
         
         return {
             "success": True,

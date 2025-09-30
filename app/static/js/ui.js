@@ -91,12 +91,12 @@ export const renderConversations = () => {
 
 export const renderAttachments = (files) => {
     dom.fileList.innerHTML = '';
-    dom.uploadFileBtn.disabled = !state.currentConvId;
+    dom.importRepoBtn.disabled = !state.currentConvId;
     
     if (!state.currentConvId) {
         dom.fileList.innerHTML = '<div class="empty-state">Select a conversation</div>';
     } else if (files.length === 0) {
-        dom.fileList.innerHTML = '<div class="empty-state">No files attached<br><small>Click upload to add files</small></div>';
+        dom.fileList.innerHTML = '<div class="empty-state">No files attached<br><small>Click import to add files from GitHub</small></div>';
     } else {
         files.forEach(f => {
             const div = document.createElement('div');

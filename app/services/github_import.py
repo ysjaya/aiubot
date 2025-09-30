@@ -102,16 +102,17 @@ def list_repo_files(repo_fullname: str, token: str):
         repo = g.get_repo(repo_fullname)
         
         files = []
-        contents = repo.get_contents("")
+        contents_list = list(repo.get_contents(""))
         
-        while contents:
-            file_content = contents.pop(0)
+        while contents_list:
+            file_content = contents_list.pop(0)
             
             if file_content.type == "dir":
                 # Skip excluded directories
                 if file_content.name not in SKIP_DIRS:
                     try:
-                        contents.extend(repo.get_contents(file_content.path))
+                        dir_contents = repo.get_contents(file_content.path)
+                        contents_list.extend(list(dir_contents) if isinstance(dir_contents, list) else [dir_contents])
                     except GithubException as e:
                         logger.warning(f"Cannot access directory {file_content.path}: {e}")
             else:
@@ -149,14 +150,18 @@ def get_file_content(repo_fullname: str, file_path: str, token: str):
         g = Github(auth=auth)
         repo = g.get_repo(repo_fullname)
         
-        file_content = repo.get_contents(file_path)
-        content = file_content.decoded_content.decode('utf-8')
+        file_content_obj = repo.get_contents(file_path)
+        # Handle both single file and list return types
+        if isinstance(file_content_obj, list):
+            file_content_obj = file_content_obj[0]
+        
+        content = file_content_obj.decoded_content.decode('utf-8')
         
         logger.info(f"Retrieved file: {file_path} from {repo_fullname}")
         return {
             'content': content,
-            'sha': file_content.sha,
-            'size': file_content.size
+            'sha': file_content_obj.sha,
+            'size': file_content_obj.size
         }
         
     except UnicodeDecodeError:
@@ -192,16 +197,19 @@ def import_selected_files(
                 if progress_callback:
                     progress_callback(idx + 1, total, file_path)
                 
-                file_content = repo.get_contents(file_path)
+                file_content_obj = repo.get_contents(file_path)
+                # Handle both single file and list return types
+                if isinstance(file_content_obj, list):
+                    file_content_obj = file_content_obj[0]
                 
                 # Verify it's not too large
-                if file_content.size > 1_000_000:
-                    logger.warning(f"Skipping large file: {file_path} ({file_content.size} bytes)")
+                if file_content_obj.size > 1_000_000:
+                    logger.warning(f"Skipping large file: {file_path} ({file_content_obj.size} bytes)")
                     continue
                 
                 # Try to decode as UTF-8
                 try:
-                    content = file_content.decoded_content.decode('utf-8')
+                    content = file_content_obj.decoded_content.decode('utf-8')
                 except UnicodeDecodeError:
                     logger.warning(f"Skipping non-UTF-8 file: {file_path}")
                     continue
@@ -209,8 +217,8 @@ def import_selected_files(
                 imported_files.append({
                     'path': file_path,
                     'content': content,
-                    'size': file_content.size,
-                    'sha': file_content.sha,
+                    'size': file_content_obj.size,
+                    'sha': file_content_obj.sha,
                     'metadata': {
                         'repo': repo_fullname,
                         'imported_at': datetime.utcnow().isoformat(),
@@ -218,7 +226,7 @@ def import_selected_files(
                     }
                 })
                 
-                logger.info(f"Imported: {file_path} ({file_content.size} bytes)")
+                logger.info(f"Imported: {file_path} ({file_content_obj.size} bytes)")
                 
             except Exception as e:
                 logger.error(f"Failed to import {file_path}: {e}")

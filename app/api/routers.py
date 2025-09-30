@@ -17,27 +17,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 async def get_github_token(authorization: Optional[str] = Header(None)):
-    """Mengekstrak dan memvalidasi token GitHub dari header Authorization"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header missing")
+    """Get GitHub token from Replit connector or authorization header"""
+    from app.services.replit_connector import get_github_access_token
     
+    # First, try to get token from Replit connector
     try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
-        
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        github_token = payload.get("access_token")
-        
-        if not github_token:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        return github_token
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
-    except JWTError as e:
-        logger.error(f"JWT decode error: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        github_token = await get_github_access_token()
+        if github_token:
+            return github_token
+    except Exception as e:
+        logger.debug(f"Replit connector not available: {e}")
+    
+    # Fallback to authorization header (legacy support)
+    if authorization:
+        try:
+            scheme, token = authorization.split()
+            if scheme.lower() == "bearer":
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                github_token = payload.get("access_token")
+                if github_token:
+                    return github_token
+        except (ValueError, JWTError) as e:
+            logger.debug(f"Authorization header invalid: {e}")
+    
+    raise HTTPException(
+        status_code=401, 
+        detail="GitHub not connected. Please connect GitHub in the integrations panel."
+    )
 
 # ==================== PROJECT MANAGEMENT ====================
 

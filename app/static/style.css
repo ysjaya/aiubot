@@ -878,3 +878,156 @@ input, textarea {
         padding-right: max(0px, var(--safe-area-right));
     }
 }
+
+/* ==================== GITHUB IMPORT MODAL ==================== */
+
+.github-step {
+    min-height: 300px;
+}
+
+.repo-list, .file-selection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.repo-item {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.repo-info {
+    flex: 1;
+}
+
+.repo-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.repo-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.repo-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.badge {
+    background: var(--accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.badge.private {
+    background: var(--error);
+}
+
+.file-import-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+}
+
+.file-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.file-checkbox-item:hover {
+    background: var(--bg-secondary);
+}
+
+.file-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.file-path {
+    flex: 1;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+}
+
+.file-size {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--radius);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.loading-spinner i {
+    font-size: 24px;
+    margin-bottom: 12px;
+}
+
+/* Mobile responsive for GitHub modal */
+@media (max-width: 768px) {
+    .repo-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .file-checkbox-item {
+        font-size: 12px;
+    }
+    
+    .repo-list, .file-selection-list {
+        max-height: 50vh;
+    }
+}

@@ -120,8 +120,8 @@
         <aside id="sidebar-right" class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title">Project Files</div>
-                <button id="upload-file-btn" class="btn-icon" title="Upload File" aria-label="Upload file">
-                    <i class="fas fa-upload"></i>
+                <button id="import-repo-btn" class="btn-icon" title="Import Repository" aria-label="Import repository">
+                    <i class="fab fa-github"></i>
                 </button>
             </div>
             <div class="sidebar-content" id="file-list"></div>
@@ -131,19 +131,37 @@
     <!-- Mobile Overlay -->
     <div id="mobile-overlay" class="hidden"></div>
 
-    <!-- Version History Modal -->
+    <!-- GitHub Import Modal -->
     <dialog id="github-modal">
         <div class="modal-header">
-            <h3 class="modal-title" id="modal-title">File Versions</h3>
+            <h3 class="modal-title" id="modal-title">Import from GitHub</h3>
             <button class="btn-icon" id="modal-close-btn" aria-label="Close modal">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="modal-body" id="modal-content"></div>
+        <div class="modal-body" id="modal-content">
+            <div id="github-step-1" class="github-step">
+                <h4>Select Repository</h4>
+                <div id="repo-list-container">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Loading repositories...
+                    </div>
+                </div>
+            </div>
+            <div id="github-step-2" class="github-step hidden">
+                <h4>Select Files to Import</h4>
+                <button id="back-to-repos-btn" class="btn-small">
+                    <i class="fas fa-arrow-left"></i> Back to Repositories
+                </button>
+                <div id="file-selection-container"></div>
+                <div class="modal-actions">
+                    <button id="import-selected-btn" class="btn-primary">
+                        <i class="fas fa-download"></i> Import Selected Files
+                    </button>
+                </div>
+            </div>
+        </div>
     </dialog>
-
-    <!-- File Upload Input -->
-    <input type="file" id="file-upload-input" class="hidden" aria-hidden="true">
     
     <!-- Toast Notification -->
     <div id="toast" class="hidden" role="alert" aria-live="polite"></div>

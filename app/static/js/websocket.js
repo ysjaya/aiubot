@@ -3,7 +3,7 @@ import { dom } from './dom.js';
 import { setLoading, showToast, appendMessage, processCodeBlocks, autoResizeTextarea } from './ui.js';
 import { actions } from './actions.js';
 
-export function setupWebSocket() {
+export async function setupWebSocket() {
     const message = dom.userInput.value.trim();
     
     if (!message) {
@@ -11,14 +11,30 @@ export function setupWebSocket() {
         return;
     }
     
+    // Auto-create project if needed
     if (!state.currentProjectId) {
-        showToast("Select a project first", "error");
-        return;
+        try {
+            const project = await fetch('/api/project?name=' + encodeURIComponent('New Project ' + new Date().toLocaleDateString()), { method: 'POST' })
+                .then(r => r.json());
+            state.currentProjectId = project.id;
+            await actions.loadProjects();
+        } catch (err) {
+            showToast("Failed to create project", "error");
+            return;
+        }
     }
     
+    // Auto-create conversation if needed
     if (!state.currentConvId) {
-        showToast("Select or create a conversation first", "error");
-        return;
+        try {
+            const conv = await fetch(`/api/conversation?project_id=${state.currentProjectId}&title=` + encodeURIComponent('Chat ' + new Date().toLocaleTimeString()), { method: 'POST' })
+                .then(r => r.json());
+            state.currentConvId = conv.id;
+            await actions.loadConversations();
+        } catch (err) {
+            showToast("Failed to create conversation", "error");
+            return;
+        }
     }
 
     if (state.ws) {

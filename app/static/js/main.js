@@ -22,10 +22,19 @@ dom.userInput.addEventListener('keydown', (e) => {
     }
 });
 
-dom.uploadFileBtn.addEventListener('click', () => dom.fileUploadInput.click());
-dom.fileUploadInput.addEventListener('change', actions.handleFileAttach);
+dom.importRepoBtn.addEventListener('click', actions.handleGitHubImport);
 
 dom.modalCloseBtn.addEventListener('click', () => dom.githubModal.close());
+
+// GitHub import handlers
+document.addEventListener('click', (e) => {
+    if (e.target.closest('#import-selected-btn')) {
+        actions.handleImportSelectedFiles();
+    }
+    if (e.target.closest('#back-to-repos-btn')) {
+        actions.handleBackToRepos();
+    }
+});
 
 // Mobile sidebars
 dom.toggleLeftSidebarBtn?.addEventListener('click', (e) => {
