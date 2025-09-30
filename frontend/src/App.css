@@ -1006,3 +1006,596 @@ body {
 .modal-footer button {
   min-width: 120px;
   }
+
+/* ==================== CODE CANVAS ==================== */
+.code-canvas-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.2s;
+}
+
+.code-canvas {
+  background: #1e1e1e;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.code-canvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  background: #252525;
+  border-radius: 12px 12px 0 0;
+}
+
+.code-canvas-header h3 {
+  color: #fff;
+  font-size: 16px;
+  margin: 0;
+}
+
+.code-canvas-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.code-canvas-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-canvas-content pre {
+  margin: 0 !important;
+  background: #1e1e1e !important;
+  border-radius: 8px !important;
+}
+
+/* ==================== CODE BLOCK WITH CANVAS LINK ==================== */
+.code-block-wrapper {
+  background: #1e1e1e;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #252525;
+  border-bottom: 1px solid #333;
+}
+
+.code-language {
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.code-view-button {
+  background: #3a6db5;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.code-view-button:hover {
+  background: #2a5d9f;
+}
+
+.code-preview {
+  padding: 12px;
+  background: #1a1a1a;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.code-preview code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #e0e0e0;
+  white-space: pre;
+  display: block;
+}
+
+/* ==================== TYPEWRITER EFFECT ==================== */
+.typewriter {
+  display: inline-block;
+  animation: blink 1s step-end infinite;
+  margin: 4px 0;
+  line-height: 1.6;
+}
+
+@keyframes blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.chat-bubble.streaming {
+  background: linear-gradient(135deg, #2a4d8f 0%, #1a3d7f 100%);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.95; }
+}
+
+/* ==================== MOBILE OPTIMIZATION ==================== */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+  }
+  
+  .sidebar {
+    width: 100%;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  
+  .main-content {
+    flex: 1;
+    height: 60vh;
+  }
+  
+  .chat-messages {
+    padding: 12px;
+  }
+  
+  .chat-bubble {
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .chat-input-container {
+    padding: 12px;
+  }
+  
+  .chat-input textarea {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .code-canvas {
+    max-width: 100%;
+    max-height: 85vh;
+    margin: 10px;
+  }
+  
+  .code-canvas-content {
+    padding: 12px;
+  }
+  
+  .modal-content {
+    max-width: 95%;
+    max-height: 85vh;
+  }
+  
+  /* Touch-friendly buttons */
+  .btn-icon,
+  .btn-secondary,
+  .btn-primary,
+  .btn-send {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+  
+  .btn-send {
+    font-size: 14px;
+    padding: 12px 20px;
+  }
+  
+  /* Improve readability */
+  .sidebar-header h2 {
+    font-size: 16px;
+  }
+  
+  .section-header h3 {
+    font-size: 12px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .sidebar {
+    max-height: 35vh;
+  }
+  
+  .chat-bubble {
+    padding: 10px;
+    font-size: 13px;
+  }
+  
+  .code-canvas-overlay {
+    padding: 10px;
+  }
+  
+  .code-canvas {
+    border-radius: 8px;
+  }
+  
+  .modal-content {
+    max-width: 100%;
+    border-radius: 8px;
+  }
+}
+
+/* ==================== LOADING STATES ==================== */
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.spinner {
+  font-size: 48px;
+  margin-bottom: 16px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-state-small {
+  text-align: center;
+  padding: 30px 20px;
+  color: #999;
+}
+
+.empty-state-small p {
+  margin-bottom: 16px;
+}
+
+/* ==================== AUTH PROMPT ==================== */
+.auth-prompt {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.auth-prompt p {
+  color: #e0e0e0;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.btn-large {
+  font-size: 16px;
+  padding: 14px 28px;
+  min-width: 200px;
+}
+
+/* ==================== GITHUB MODAL ENHANCEMENTS ==================== */
+.github-modal {
+  max-width: 800px;
+}
+
+.repo-header,
+.repo-selected-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.repo-header h3 {
+  font-size: 18px;
+  color: #fff;
+  margin: 0;
+}
+
+.repo-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-back {
+  background: #333;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.btn-back:hover {
+  background: #444;
+}
+
+.github-repos-list {
+  max-height: 400px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.github-repo-item {
+  background: #252525;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #333;
+  transition: all 0.2s;
+}
+
+.github-repo-item:hover {
+  background: #2d2d2d;
+  border-color: #3a6db5;
+}
+
+.repo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.repo-info strong {
+  display: block;
+  color: #fff;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.repo-info small {
+  display: block;
+  color: #999;
+  font-size: 13px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.repo-meta span {
+  font-size: 12px;
+  color: #999;
+  background: #1a1a1a;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.repo-lang {
+  background: #2a4d8f !important;
+  color: #fff !important;
+}
+
+.repo-private {
+  background: #f59e0b !important;
+  color: #000 !important;
+  font-weight: 600;
+}
+
+.github-files-list {
+  max-height: 300px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 16px;
+}
+
+.github-file-item {
+  background: #252525;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border: 1px solid #333;
+  transition: all 0.2s;
+}
+
+.github-file-item:hover {
+  background: #2d2d2d;
+}
+
+.github-file-item.selected {
+  background: #2a4d8f;
+  border-color: #3a6db5;
+}
+
+.github-file-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.github-file-item .file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.github-file-item strong {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.github-file-item small {
+  display: block;
+  color: #999;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+}
+
+.file-selection-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.selection-count {
+  font-size: 13px;
+  color: #999;
+  font-weight: 600;
+}
+
+.import-progress {
+  background: #1a1a1a;
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.import-progress p {
+  color: #e0e0e0;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3a6db5 0%, #2a5d9f 100%);
+  transition: width 0.3s;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: center;
+  background: #1a1a1a;
+}
+
+/* ==================== ANIMATIONS ==================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-bubble-container {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* ==================== PERFORMANCE OPTIMIZATIONS ==================== */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.chat-messages,
+.sidebar,
+.github-repos-list,
+.github-files-list,
+.code-canvas-content {
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Force GPU acceleration for animations */
+.code-canvas,
+.modal-content,
+.chat-bubble {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid #3a6db5;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==================== SCROLLBAR STYLING ==================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}

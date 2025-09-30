@@ -6,6 +6,85 @@ import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// Code Canvas Modal Component
+function CodeCanvas({ code, language, filename, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const downloadFile = () => {
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `code.${language || 'txt'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="code-canvas-overlay" onClick={onClose}>
+      <div className="code-canvas" onClick={(e) => e.stopPropagation()}>
+        <div className="code-canvas-header">
+          <h3>{filename || `Code (${language || 'text'})`}</h3>
+          <div className="code-canvas-actions">
+            <button className="btn-icon" onClick={copyToClipboard} title="Copy">
+              {copied ? '✅' : '📋'}
+            </button>
+            <button className="btn-icon" onClick={downloadFile} title="Download">
+              ⬇️
+            </button>
+            <button className="btn-icon" onClick={onClose} title="Close">
+              ✕
+            </button>
+          </div>
+        </div>
+        <div className="code-canvas-content">
+          <SyntaxHighlighter
+            style={vscDarkPlus}
+            language={language || 'text'}
+            PreTag="div"
+            showLineNumbers
+            wrapLongLines
+          >
+            {code}
+          </SyntaxHighlighter>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Typewriter Component for streaming text line-by-line
+function TypewriterText({ text, speed = 30 }) {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentIndex, text, speed]);
+
+  useEffect(() => {
+    setDisplayText('');
+    setCurrentIndex(0);
+  }, [text]);
+
+  return <div className="typewriter">{displayText}</div>;
+}
+
 function App() {
   // State management
   const [projects, setProjects] = useState([]);
@@ -17,6 +96,7 @@ function App() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingResponse, setStreamingResponse] = useState('');
+  const [streamingLines, setStreamingLines] = useState([]);
   
   // UI state
   const [showNewProject, setShowNewProject] = useState(false);
@@ -25,6 +105,7 @@ function App() {
   const [showGitHubImport, setShowGitHubImport] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newConvTitle, setNewConvTitle] = useState('');
+  const [codeCanvas, setCodeCanvas] = useState(null);
   
   // GitHub state
   const [githubRepos, setGithubRepos] = useState([]);
@@ -43,7 +124,7 @@ function App() {
   // Auto-scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chats, streamingResponse]);
+  }, [chats, streamingLines]);
 
   // Load projects on mount
   useEffect(() => {
@@ -58,7 +139,7 @@ function App() {
       setGithubToken(token);
       localStorage.setItem('github_token', token);
       window.history.replaceState({}, document.title, window.location.pathname);
-      alert('✅ Successfully authenticated with GitHub!');
+      alert('✅ GitHub terhubung!');
     }
   }, []);
 
@@ -102,12 +183,12 @@ function App() {
       setShowNewProject(false);
     } catch (err) {
       console.error('Failed to create project:', err);
-      alert('Failed to create project');
+      alert('Gagal membuat project');
     }
   };
 
   const deleteProject = async (projectId) => {
-    if (!confirm('Delete this project? This will delete ALL conversations and files!')) return;
+    if (!confirm('Hapus project ini? Semua percakapan dan file akan terhapus!')) return;
     try {
       await fetch(`${API_URL}/api/project/${projectId}`, { method: 'DELETE' });
       setProjects(projects.filter(p => p.id !== projectId));
@@ -118,7 +199,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to delete project:', err);
-      alert('Failed to delete project');
+      alert('Gagal menghapus project');
     }
   };
 
@@ -146,12 +227,12 @@ function App() {
       setShowNewConv(false);
     } catch (err) {
       console.error('Failed to create conversation:', err);
-      alert('Failed to create conversation');
+      alert('Gagal membuat percakapan');
     }
   };
 
   const deleteConversation = async (convId) => {
-    if (!confirm('Delete this conversation?')) return;
+    if (!confirm('Hapus percakapan ini?')) return;
     try {
       await fetch(`${API_URL}/api/conversation/${convId}?project_id=${selectedProject.id}`, {
         method: 'DELETE'
@@ -164,7 +245,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to delete conversation:', err);
-      alert('Failed to delete conversation');
+      alert('Gagal menghapus percakapan');
     }
   };
 
@@ -190,7 +271,7 @@ function App() {
 
   const uploadFile = async (file) => {
     if (!selectedConv || !selectedProject) {
-      alert('Please select a conversation first');
+      alert('Pilih percakapan terlebih dahulu');
       return;
     }
 
@@ -210,25 +291,25 @@ function App() {
       
       const attachment = await res.json();
       setAttachments([attachment, ...attachments]);
-      alert(`✅ File uploaded: ${attachment.filename}`);
+      alert(`✅ File terupload: ${attachment.filename}`);
     } catch (err) {
       console.error('Failed to upload file:', err);
-      alert('Failed to upload file. Make sure it is a text file under 1MB.');
+      alert('Gagal upload file. Pastikan file teks dan di bawah 1MB.');
     }
   };
 
   const deleteAttachment = async (fileId) => {
-    if (!confirm('Delete this file and all its versions?')) return;
+    if (!confirm('Hapus file ini dan semua versinya?')) return;
     
     try {
       await fetch(`${API_URL}/api/attachment/${fileId}?project_id=${selectedProject.id}`, {
         method: 'DELETE'
       });
       setAttachments(attachments.filter(a => a.id !== fileId));
-      alert('✅ File deleted');
+      alert('✅ File terhapus');
     } catch (err) {
       console.error('Failed to delete attachment:', err);
-      alert('Failed to delete file');
+      alert('Gagal menghapus file');
     }
   };
 
@@ -246,7 +327,7 @@ function App() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to download file:', err);
-      alert('Failed to download file');
+      alert('Gagal download file');
     }
   };
 
@@ -257,6 +338,7 @@ function App() {
     setMessage('');
     setLoading(true);
     setStreamingResponse('');
+    setStreamingLines([]);
 
     const tempChat = {
       id: Date.now(),
@@ -277,6 +359,7 @@ function App() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullResponse = '';
+      let currentLine = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -299,6 +382,18 @@ function App() {
                 alert(`Error: ${parsed.message}`);
               }
             } catch {
+              // Process text line by line for typewriter effect
+              for (const char of data) {
+                if (char === '\n') {
+                  if (currentLine.trim()) {
+                    setStreamingLines(prev => [...prev, currentLine]);
+                    currentLine = '';
+                    await new Promise(resolve => setTimeout(resolve, 50)); // Delay between lines
+                  }
+                } else {
+                  currentLine += char;
+                }
+              }
               fullResponse += data;
               setStreamingResponse(fullResponse);
             }
@@ -306,13 +401,19 @@ function App() {
         }
       }
 
+      // Add remaining line if any
+      if (currentLine.trim()) {
+        setStreamingLines(prev => [...prev, currentLine]);
+      }
+
       await loadChats(selectedConv.id);
       await loadAttachments(selectedConv.id);
       setStreamingResponse('');
+      setStreamingLines([]);
 
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message');
+      alert('Gagal mengirim pesan');
       setChats(chats);
     } finally {
       setLoading(false);
@@ -334,12 +435,12 @@ function App() {
   const handleGitHubLogout = () => {
     setGithubToken(null);
     localStorage.removeItem('github_token');
-    alert('Logged out from GitHub');
+    alert('Logout dari GitHub');
   };
 
   const loadGitHubRepos = async () => {
     if (!githubToken) {
-      alert('Please authenticate with GitHub first');
+      alert('Silakan login GitHub terlebih dahulu');
       return;
     }
 
@@ -357,7 +458,7 @@ function App() {
       setGithubRepos(data.repos || []);
     } catch (err) {
       console.error('Failed to load GitHub repos:', err);
-      alert('Failed to load repositories. Please re-authenticate.');
+      alert('Gagal memuat repository. Silakan login ulang.');
       handleGitHubLogout();
     } finally {
       setLoadingRepos(false);
@@ -384,7 +485,7 @@ function App() {
       setRepoFiles(data.importable || []);
     } catch (err) {
       console.error('Failed to load repo files:', err);
-      alert('Failed to load repository files');
+      alert('Gagal memuat file repository');
       setSelectedRepo(null);
     } finally {
       setLoadingFiles(false);
@@ -411,12 +512,12 @@ function App() {
 
   const importSelectedFiles = async () => {
     if (selectedFiles.size === 0) {
-      alert('Please select files to import');
+      alert('Pilih file untuk diimport');
       return;
     }
 
     if (!selectedConv || !selectedProject) {
-      alert('Please select a conversation first');
+      alert('Pilih percakapan terlebih dahulu');
       return;
     }
 
@@ -444,7 +545,7 @@ function App() {
       const data = await res.json();
       
       if (data.success) {
-        alert(`✅ Successfully imported ${data.imported_count} files!`);
+        alert(`✅ Berhasil import ${data.imported_count} file!`);
         await loadAttachments(selectedConv.id);
         setShowGitHubImport(false);
         setSelectedRepo(null);
@@ -453,7 +554,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to import files:', err);
-      alert('Failed to import files: ' + err.message);
+      alert('Gagal import file: ' + err.message);
     } finally {
       setImportProgress(null);
     }
@@ -461,7 +562,7 @@ function App() {
 
   const openGitHubImportModal = () => {
     if (!selectedConv) {
-      alert('Please select a conversation first');
+      alert('Pilih percakapan terlebih dahulu');
       return;
     }
     
@@ -498,6 +599,27 @@ function App() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  // Custom Code Block Renderer dengan link ke canvas
+  const CodeBlock = ({ language, value }) => {
+    const filename = `code.${language || 'txt'}`;
+    return (
+      <div className="code-block-wrapper">
+        <div className="code-block-header">
+          <span className="code-language">{language || 'text'}</span>
+          <button
+            className="code-view-button"
+            onClick={() => setCodeCanvas({ code: value, language, filename })}
+          >
+            📝 Lihat di Canvas →
+          </button>
+        </div>
+        <div className="code-preview">
+          <code>{value.split('\n').slice(0, 3).join('\n')}...</code>
+        </div>
+      </div>
+    );
+  };
+
   // ==================== JSX RENDER ====================
 
   return (
@@ -505,7 +627,7 @@ function App() {
       {/* SIDEBAR */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>AI Code Assistant</h2>
+          <h2>🤖 AI Code</h2>
           <button className="btn-icon" onClick={() => setShowFileManager(!showFileManager)}>
             📁
           </button>
@@ -524,17 +646,17 @@ function App() {
             <div className="new-item-form">
               <input
                 type="text"
-                placeholder="Project name..."
+                placeholder="Nama project..."
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && createProject()}
               />
               <div className="form-actions">
                 <button className="btn-secondary" onClick={() => setShowNewProject(false)}>
-                  Cancel
+                  Batal
                 </button>
                 <button className="btn-primary" onClick={createProject}>
-                  Create
+                  Buat
                 </button>
               </div>
             </div>
@@ -549,7 +671,7 @@ function App() {
               >
                 <div>
                   <strong>{p.name}</strong>
-                  <small>{new Date(p.created_at).toLocaleDateString()}</small>
+                  <small>{new Date(p.created_at).toLocaleDateString('id-ID')}</small>
                 </div>
                 <button
                   className="btn-delete"
@@ -568,7 +690,7 @@ function App() {
         {/* CONVERSATIONS */}
         <div className="sidebar-section">
           <div className="section-header">
-            <h3>Conversations</h3>
+            <h3>Percakapan</h3>
             <button
               className="btn-icon"
               onClick={() => setShowNewConv(!showNewConv)}
@@ -582,17 +704,17 @@ function App() {
             <div className="new-item-form">
               <input
                 type="text"
-                placeholder="Conversation title..."
+                placeholder="Judul percakapan..."
                 value={newConvTitle}
                 onChange={(e) => setNewConvTitle(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && createConversation()}
               />
               <div className="form-actions">
                 <button className="btn-secondary" onClick={() => setShowNewConv(false)}>
-                  Cancel
+                  Batal
                 </button>
                 <button className="btn-primary" onClick={createConversation}>
-                  Create
+                  Buat
                 </button>
               </div>
             </div>
@@ -607,7 +729,7 @@ function App() {
               >
                 <div>
                   <strong>{c.title}</strong>
-                  <small>{new Date(c.created_at).toLocaleDateString()}</small>
+                  <small>{new Date(c.created_at).toLocaleDateString('id-ID')}</small>
                 </div>
                 <button
                   className="btn-delete"
@@ -628,23 +750,23 @@ function App() {
       <div className="main-content">
         {!selectedConv ? (
           <div className="empty-state">
-            <h2>Welcome to AI Code Assistant</h2>
-            <p>Select or create a project and conversation to get started</p>
+            <h2>Selamat Datang di AI Code Assistant</h2>
+            <p>Pilih atau buat project dan percakapan untuk mulai</p>
             <div className="features">
               <div className="feature">
                 <span>📁</span>
-                <h3>Project Management</h3>
-                <p>Organize your code by projects with isolated databases</p>
+                <h3>Manajemen Project</h3>
+                <p>Atur kode Anda berdasarkan project</p>
               </div>
               <div className="feature">
                 <span>💬</span>
                 <h3>AI Chat</h3>
-                <p>Get intelligent code assistance with context awareness</p>
+                <p>Dapatkan bantuan kode dari AI</p>
               </div>
               <div className="feature">
                 <span>📝</span>
-                <h3>File Versioning</h3>
-                <p>Track file changes with automatic versioning</p>
+                <h3>Versioning File</h3>
+                <p>Lacak perubahan file otomatis</p>
               </div>
             </div>
           </div>
@@ -662,7 +784,7 @@ function App() {
                   onClick={openGitHubImportModal}
                   disabled={!selectedConv}
                 >
-                  📦 Import from GitHub
+                  📦 Import GitHub
                 </button>
               </div>
             </div>
@@ -671,12 +793,12 @@ function App() {
             {showFileManager && (
               <div className="file-manager">
                 <div className="file-manager-header">
-                  <h3>Attached Files ({attachments.length})</h3>
+                  <h3>File Terlampir ({attachments.length})</h3>
                   <button onClick={() => setShowFileManager(false)}>✕</button>
                 </div>
                 <div className="file-list">
                   {attachments.length === 0 ? (
-                    <div className="empty-files">No files attached yet</div>
+                    <div className="empty-files">Belum ada file</div>
                   ) : (
                     attachments.map(att => (
                       <div key={att.id} className="file-item">
@@ -686,7 +808,6 @@ function App() {
                             <strong>{att.filename}</strong>
                             <small>
                               v{att.version} • {formatFileSize(att.size_bytes)}
-                              {att.modification_summary && ` • ${att.modification_summary}`}
                             </small>
                           </div>
                         </div>
@@ -701,7 +822,7 @@ function App() {
                           <button
                             className="btn-delete"
                             onClick={() => deleteAttachment(att.id)}
-                            title="Delete"
+                            title="Hapus"
                           >
                             🗑️
                           </button>
@@ -718,7 +839,7 @@ function App() {
               {chats.map((chat) => (
                 <div key={chat.id} className="chat-bubble-container">
                   <div className="chat-bubble user">
-                    <strong>You</strong>
+                    <strong>Anda</strong>
                     <ReactMarkdown>{chat.message}</ReactMarkdown>
                   </div>
                   <div className="chat-bubble ai">
@@ -727,16 +848,13 @@ function App() {
                       components={{
                         code({node, inline, className, children, ...props}) {
                           const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={vscDarkPlus}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
+                          const value = String(children).replace(/\n$/, '');
+                          
+                          if (!inline && match) {
+                            return <CodeBlock language={match[1]} value={value} />;
+                          }
+                          
+                          return (
                             <code className={className} {...props}>
                               {children}
                             </code>
@@ -750,7 +868,19 @@ function App() {
                 </div>
               ))}
 
-              {streamingResponse && (
+              {/* Streaming response dengan typewriter effect */}
+              {streamingLines.length > 0 && (
+                <div className="chat-bubble-container">
+                  <div className="chat-bubble ai streaming">
+                    <strong>AI Assistant</strong>
+                    {streamingLines.map((line, idx) => (
+                      <TypewriterText key={idx} text={line} speed={20} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {streamingResponse && streamingLines.length === 0 && (
                 <div className="chat-bubble-container">
                   <div className="chat-bubble ai streaming">
                     <strong>AI Assistant</strong>
@@ -788,7 +918,7 @@ function App() {
                       sendMessage();
                     }
                   }}
-                  placeholder="Ask anything about your code..."
+                  placeholder="Tanya apa saja tentang kode Anda..."
                   disabled={loading}
                   rows={3}
                 />
@@ -797,7 +927,7 @@ function App() {
                   onClick={sendMessage}
                   disabled={loading || !message.trim()}
                 >
-                  {loading ? '⏳' : '📤'} Send
+                  {loading ? '⏳' : '📤'}
                 </button>
               </div>
             </div>
@@ -805,12 +935,22 @@ function App() {
         )}
       </div>
 
+      {/* CODE CANVAS MODAL */}
+      {codeCanvas && (
+        <CodeCanvas
+          code={codeCanvas.code}
+          language={codeCanvas.language}
+          filename={codeCanvas.filename}
+          onClose={() => setCodeCanvas(null)}
+        />
+      )}
+
       {/* GITHUB IMPORT MODAL */}
       {showGitHubImport && (
         <div className="modal-overlay" onClick={closeGitHubImportModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content github-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>📦 Import from GitHub</h2>
+              <h2>📦 Import dari GitHub</h2>
               <button className="btn-close" onClick={closeGitHubImportModal}>
                 ✕
               </button>
@@ -818,38 +958,36 @@ function App() {
 
             <div className="modal-body">
               {!githubToken ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <p style={{ marginBottom: '20px', fontSize: '16px' }}>
-                    Connect your GitHub account to import repositories
-                  </p>
-                  <button className="btn-primary" onClick={handleGitHubAuth} style={{ fontSize: '16px', padding: '12px 24px' }}>
-                    🔐 Connect GitHub
+                <div className="auth-prompt">
+                  <p>Hubungkan akun GitHub Anda untuk import repository</p>
+                  <button className="btn-primary btn-large" onClick={handleGitHubAuth}>
+                    🔐 Hubungkan GitHub
                   </button>
                 </div>
               ) : !selectedRepo ? (
                 <>
-                  <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3>Your Repositories</h3>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                  <div className="repo-header">
+                    <h3>Repository Anda</h3>
+                    <div className="repo-actions">
                       <button className="btn-secondary" onClick={loadGitHubRepos} disabled={loadingRepos}>
-                        {loadingRepos ? '⏳ Loading...' : '🔄 Refresh'}
+                        {loadingRepos ? '⏳' : '🔄'}
                       </button>
                       <button className="btn-secondary" onClick={handleGitHubLogout}>
-                        🚪 Logout
+                        🚪
                       </button>
                     </div>
                   </div>
 
                   {loadingRepos ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '20px' }}>⏳</div>
-                      <p>Loading repositories...</p>
+                    <div className="loading-state">
+                      <div className="spinner">⏳</div>
+                      <p>Memuat repository...</p>
                     </div>
                   ) : githubRepos.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                      <p style={{ marginBottom: '20px', color: '#999' }}>No repositories loaded yet</p>
+                    <div className="empty-state-small">
+                      <p>Belum ada repository</p>
                       <button className="btn-primary" onClick={loadGitHubRepos}>
-                        Load My Repositories
+                        Muat Repository
                       </button>
                     </div>
                   ) : (
@@ -858,24 +996,21 @@ function App() {
                         <div key={repo.full_name} className="github-repo-item">
                           <div className="repo-info">
                             <strong>{repo.name}</strong>
-                            <small>{repo.description || 'No description'}</small>
+                            <small>{repo.description || 'Tidak ada deskripsi'}</small>
                             <div className="repo-meta">
                               {repo.language && (
                                 <span className="repo-lang">{repo.language}</span>
                               )}
                               <span>⭐ {repo.stars}</span>
-                              <span>📦 {(repo.size / 1024).toFixed(1)} MB</span>
-                              {repo.private && <span style={{color: '#f59e0b'}}>🔒 Private</span>}
+                              {repo.private && <span className="repo-private">🔒</span>}
                             </div>
                           </div>
-                          <div className="repo-actions">
-                            <button
-                              className="btn-primary"
-                              onClick={() => selectRepo(repo)}
-                            >
-                              Select →
-                            </button>
-                          </div>
+                          <button
+                            className="btn-primary"
+                            onClick={() => selectRepo(repo)}
+                          >
+                            Pilih →
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -883,51 +1018,49 @@ function App() {
                 </>
               ) : (
                 <>
-                  <div className="repo-header">
+                  <div className="repo-selected-header">
                     <button className="btn-back" onClick={() => {
                       setSelectedRepo(null);
                       setRepoFiles([]);
                       setSelectedFiles(new Set());
                     }}>
-                      ← Back
+                      ← Kembali
                     </button>
                     <h3>{selectedRepo.name}</h3>
                   </div>
 
                   {loadingFiles ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '20px' }}>⏳</div>
-                      <p>Loading repository files...</p>
+                    <div className="loading-state">
+                      <div className="spinner">⏳</div>
+                      <p>Memuat file...</p>
                     </div>
                   ) : repoFiles.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                      <p style={{ color: '#999' }}>No importable files found in this repository</p>
+                    <div className="empty-state-small">
+                      <p>Tidak ada file yang bisa diimport</p>
                     </div>
                   ) : (
                     <>
                       <div className="file-selection-actions">
                         <button className="btn-secondary" onClick={selectAllFiles}>
-                          Select All
+                          Pilih Semua
                         </button>
                         <button className="btn-secondary" onClick={deselectAllFiles}>
-                          Deselect All
+                          Batal Pilih
                         </button>
                         <span className="selection-count">
-                          {selectedFiles.size} / {repoFiles.length} selected
+                          {selectedFiles.size} / {repoFiles.length}
                         </span>
                       </div>
 
                       {importProgress && (
                         <div className="import-progress">
+                          <p>Mengimport file...</p>
                           <div className="progress-bar">
-                            <div
-                              className="progress-fill"
+                            <div 
+                              className="progress-fill" 
                               style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                             />
                           </div>
-                          <span>
-                            Importing {importProgress.current} / {importProgress.total} files...
-                          </span>
                         </div>
                       )}
 
@@ -942,9 +1075,8 @@ function App() {
                               type="checkbox"
                               checked={selectedFiles.has(file.path)}
                               onChange={() => toggleFileSelection(file.path)}
-                              onClick={(e) => e.stopPropagation()}
                             />
-                            <div className="file-path">
+                            <div className="file-info">
                               <strong>{file.path.split('/').pop()}</strong>
                               <small>{file.path}</small>
                             </div>
@@ -952,33 +1084,21 @@ function App() {
                           </div>
                         ))}
                       </div>
+
+                      <div className="modal-footer">
+                        <button
+                          className="btn-primary btn-large"
+                          onClick={importSelectedFiles}
+                          disabled={selectedFiles.size === 0 || importProgress}
+                        >
+                          Import {selectedFiles.size} File
+                        </button>
+                      </div>
                     </>
                   )}
                 </>
               )}
             </div>
-
-            {selectedRepo && repoFiles.length > 0 && (
-              <div className="modal-footer">
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setSelectedRepo(null);
-                    setRepoFiles([]);
-                    setSelectedFiles(new Set());
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={importSelectedFiles}
-                  disabled={selectedFiles.size === 0 || importProgress}
-                >
-                  {importProgress ? '⏳ Importing...' : `Import ${selectedFiles.size} file${selectedFiles.size !== 1 ? 's' : ''}`}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
