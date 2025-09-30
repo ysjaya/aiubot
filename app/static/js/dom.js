@@ -13,7 +13,6 @@ export const dom = {
     aiStatusText: document.getElementById('ai-status-text'),
     spinner: document.getElementById('spinner'),
     toast: document.getElementById('toast'),
-    importGithubBtn: document.getElementById('import-github-btn'),
     uploadFileBtn: document.getElementById('upload-file-btn'),
     fileUploadInput: document.getElementById('file-upload-input'),
     sidebarLeft: document.getElementById('sidebar-left'),
