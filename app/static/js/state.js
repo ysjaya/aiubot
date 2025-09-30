@@ -1,12 +1,9 @@
 export const state = {
     projects: [],
     conversations: [],
-    files: [],
+    attachments: [],
     currentProjectId: null,
     currentConvId: null,
     isLoading: false,
     ws: null,
-    githubToken: null,
-    githubRepos: [],
-    selectedRepos: new Set(),
 };
