@@ -7,5 +7,6 @@ export const state = {
     isLoading: false,
     ws: null,
     githubToken: null,
-    selectedRepo: null,
+    githubRepos: [],
+    selectedRepos: new Set(),
 };
