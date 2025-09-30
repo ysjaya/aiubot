@@ -70,3 +70,64 @@ def get_file_content(repo_fullname: str, file_path: str, token: str):
     except Exception as e:
         logger.error(f"Error getting file {file_path} from {repo_fullname}: {e}")
         raise
+
+def get_all_repo_files(repo_fullname: str, token: str):
+    """Get all text files from a repository"""
+    try:
+        auth = Auth.Token(token)
+        g = Github(auth=auth)
+        repo = g.get_repo(repo_fullname)
+        
+        files_data = []
+        contents = repo.get_contents("")
+        
+        # Extensions to import
+        text_extensions = {
+            '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp',
+            '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r',
+            '.html', '.css', '.scss', '.sass', '.less', '.vue', '.svelte',
+            '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf',
+            '.md', '.txt', '.rst', '.adoc',
+            '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd',
+            '.sql', '.prisma', '.graphql', '.proto',
+            '.env.example', '.gitignore', '.dockerignore',
+            'Dockerfile', 'Makefile', 'Rakefile', 'CMakeLists.txt'
+        }
+        
+        while contents:
+            file_content = contents.pop(0)
+            
+            if file_content.type == "dir":
+                # Skip common non-source directories
+                skip_dirs = {'node_modules', '__pycache__', 'venv', 'env', '.git', 
+                           'dist', 'build', '.next', '.nuxt', 'target', 'bin', 'obj'}
+                if file_content.name not in skip_dirs:
+                    contents.extend(repo.get_contents(file_content.path))
+            else:
+                # Check if file should be imported
+                file_ext = '.' + file_content.name.split('.')[-1] if '.' in file_content.name else ''
+                
+                if (file_ext.lower() in text_extensions or 
+                    file_content.name in text_extensions or
+                    file_content.size < 100000):  # Max 100KB per file
+                    
+                    try:
+                        content = file_content.decoded_content.decode('utf-8')
+                        files_data.append({
+                            'path': file_content.path,
+                            'content': content
+                        })
+                        logger.info(f"Imported: {file_content.path}")
+                    except (UnicodeDecodeError, Exception) as e:
+                        logger.warning(f"Skipped {file_content.path}: {str(e)}")
+                        continue
+        
+        logger.info(f"Imported {len(files_data)} files from {repo_fullname}")
+        return files_data
+        
+    except GithubException as e:
+        logger.error(f"GitHub API error: {e}")
+        raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+    except Exception as e:
+        logger.error(f"Error importing repo {repo_fullname}: {e}")
+        raise
