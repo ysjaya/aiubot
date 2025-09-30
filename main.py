@@ -59,6 +59,15 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Could not mount static files: {e}")
 
+# Mount frontend build for production (if exists)
+import os
+if os.path.exists("frontend/dist"):
+    try:
+        app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+        logger.info("✅ Frontend assets mounted")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not mount frontend assets: {e}")
+
 # Templates
 try:
     templates = Jinja2Templates(directory="app/templates")
@@ -83,6 +92,17 @@ except ImportError as e:
 @app.get("/")
 async def root(request: Request):
     """Root endpoint - serve frontend or return info"""
+    import os
+    from fastapi.responses import FileResponse
+    
+    # In production, serve React build
+    if os.path.exists("frontend/dist/index.html"):
+        try:
+            return FileResponse("frontend/dist/index.html")
+        except Exception as e:
+            logger.error(f"Frontend error: {e}")
+    
+    # Fallback to template
     if templates:
         try:
             return templates.TemplateResponse("index.html", {"request": request})

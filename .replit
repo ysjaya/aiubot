@@ -38,3 +38,8 @@ externalPort = 80
 [[ports]]
 localPort = 44081
 externalPort = 3000
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-5000}"]
+build = ["bash", "-c", "cd frontend && npm install && npm run build"]
