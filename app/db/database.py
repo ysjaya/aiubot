@@ -3,6 +3,7 @@ from sqlalchemy import text
 from app.core.config import settings
 import logging
 from functools import lru_cache
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +57,11 @@ def create_project_database(project_name: str) -> str:
         raise
 
 def delete_project_database(database_name: str):
-    """Delete project database"""
+    """Delete project database and clear cache"""
     try:
-        # Clear cache for this database
-        if hasattr(get_project_engine, 'cache_info'):
-            get_project_engine.cache_clear()
+        # CRITICAL FIX: Clear cache BEFORE deleting database
+        logger.info(f"Clearing cache for database: {database_name}")
+        get_project_engine.cache_clear()
         
         # Terminate all connections first
         with engine.connect() as conn:
@@ -87,21 +88,40 @@ def delete_project_database(database_name: str):
 def get_project_engine(database_name: str):
     """Get cached engine for specific project database"""
     project_url = settings.DATABASE_URL.rsplit('/', 1)[0] + f'/{database_name}'
-    return create_engine(
-        project_url,
-        echo=False,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        pool_recycle=3600
-    )
-
-def get_project_session(database_name: str):
-    """Get session for specific project database"""
-    project_engine = get_project_engine(database_name)
     
-    with Session(project_engine) as session:
-        yield session
+    # FIX: Add error handling for non-existent databases
+    try:
+        eng = create_engine(
+            project_url,
+            echo=False,
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_recycle=3600
+        )
+        
+        # Test connection
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        return eng
+        
+    except Exception as e:
+        logger.error(f"Failed to create engine for {database_name}: {e}")
+        raise Exception(f"Database '{database_name}' does not exist or is inaccessible")
+
+@contextmanager
+def get_project_session(database_name: str):
+    """Get session for specific project database with error handling"""
+    try:
+        project_engine = get_project_engine(database_name)
+        
+        with Session(project_engine) as session:
+            yield session
+            
+    except Exception as e:
+        logger.error(f"Failed to get project session for {database_name}: {e}")
+        raise
 
 def init_main_database():
     """Initialize main metadata database"""
@@ -111,3 +131,8 @@ def init_main_database():
     except Exception as e:
         logger.error(f"Failed to initialize main database: {e}")
         raise
+
+def cleanup_stale_engines():
+    """Manually clear engine cache - call this periodically or after errors"""
+    get_project_engine.cache_clear()
+    logger.info("Cleared all cached database engines")
