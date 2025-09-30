@@ -13,20 +13,16 @@ class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Relationships
-    conversations: List["Conversation"] = Relationship(back_populates="project")
+    conversations: List["Conversation"] = Relationship(back_populates="project", cascade_delete=True)
 
 class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(sa_column=Column(Integer, ForeignKey("project.id", ondelete="CASCADE")))
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Relationships
     project: Optional[Project] = Relationship(back_populates="conversations")
-    chats: List["Chat"] = Relationship(back_populates="conversation")
-    attachments: List["Attachment"] = Relationship(back_populates="conversation")
+    chats: List["Chat"] = Relationship(back_populates="conversation", cascade_delete=True)
+    attachments: List["Attachment"] = Relationship(back_populates="conversation", cascade_delete=True)
 
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -35,40 +31,26 @@ class Chat(SQLModel, table=True):
     message: str
     ai_response: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Store IDs of files that were in context
-    context_file_ids: Optional[str] = Field(default=None)  # JSON string of file IDs
-    
-    # Relationships
+    context_file_ids: Optional[str] = Field(default=None)
     conversation: Optional[Conversation] = Relationship(back_populates="chats")
 
 class Attachment(SQLModel, table=True):
-    """File attachments per conversation with versioning"""
     id: Optional[int] = Field(default=None, primary_key=True)
     conversation_id: int = Field(sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE")))
-    
-    # File info
     filename: str
-    original_filename: str  # Original name when uploaded
+    original_filename: str
     content: str
     mime_type: str = Field(default="text/plain")
     size_bytes: int
-    
-    # Versioning
     status: FileStatus = Field(default=FileStatus.ORIGINAL)
     version: int = Field(default=1)
     parent_file_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("attachment.id", ondelete="SET NULL")))
-    
-    # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    modification_summary: Optional[str] = Field(default=None)  # AI summary of changes
-    
-    # Relationships
+    modification_summary: Optional[str] = Field(default=None)
     conversation: Optional[Conversation] = Relationship(back_populates="attachments")
     
     def get_display_status(self) -> str:
-        """Get human-readable status"""
         status_map = {
             FileStatus.ORIGINAL: "📄 Original",
             FileStatus.MODIFIED: "✏️ Modified",
