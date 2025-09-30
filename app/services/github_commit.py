@@ -1,7 +1,7 @@
 # app/services/github_commit.py
 import logging
 from typing import List, Dict, Optional
-from github import Github, GithubException
+from github import Github, GithubException, InputGitTreeElement
 from sqlmodel import Session, select
 from app.db import models
 
@@ -58,83 +58,69 @@ def commit_all_files(
             base_tree = base_commit.tree
         except GithubException as e:
             if e.status == 404:
-                # Branch doesn't exist, create it
-                logger.info(f"[GITHUB COMMIT] Branch {branch} doesn't exist, will create it")
-                master_ref = repo.get_git_ref("heads/main")
-                base_commit = repo.get_git_commit(master_ref.object.sha)
+                # Branch doesn't exist, create it from default branch
+                default_branch = repo.default_branch
+                default_ref = repo.get_git_ref(f"heads/{default_branch}")
+                repo.create_git_ref(f"refs/heads/{branch}", default_ref.object.sha)
+                ref = repo.get_git_ref(f"heads/{branch}")
+                base_commit = repo.get_git_commit(default_ref.object.sha)
                 base_tree = base_commit.tree
+                logger.info(f"[GITHUB COMMIT] Created new branch: {branch}")
             else:
                 raise
         
-        # Prepare tree elements for all files
+        # Create blob for each file and build tree
         tree_elements = []
         
-        for att in attachments:
-            # Determine file path
-            if base_path:
-                file_path = f"{base_path.rstrip('/')}/{att.original_filename or att.filename}"
-            else:
-                file_path = att.original_filename or att.filename
+        for attachment in attachments:
+            # Skip if no content
+            if not attachment.content:
+                logger.warning(f"Skipping empty file: {attachment.filename}")
+                continue
+                
+            # Create blob
+            blob = repo.create_git_blob(attachment.content, "utf-8")
             
-            logger.info(f"[GITHUB COMMIT] Adding file: {file_path}")
+            # Create proper InputGitTreeElement
+            element = InputGitTreeElement(
+                path=f"{base_path}/{attachment.filename}".lstrip('/'),  # Ensure proper path
+                mode="100644",  # File mode
+                type="blob",    # Object type
+                sha=blob.sha    # SHA of the blob
+            )
             
-            # Create blob for file content
-            blob = repo.create_git_blob(att.content, "utf-8")
-            
-            tree_elements.append({
-                "path": file_path,
-                "mode": "100644",  # Regular file
-                "type": "blob",
-                "sha": blob.sha
-            })
+            tree_elements.append(element)
+            logger.debug(f"Added file to commit: {attachment.filename}")
         
-        # Create new tree
-        new_tree = repo.create_git_tree(tree_elements, base_tree)
-        
-        # Create commit message
-        if not commit_message:
-            commit_message = f"Update {len(attachments)} file(s) from AI Code Assistant"
+        # Create new tree with all files
+        tree = repo.create_git_tree(tree_elements, base_tree)
         
         # Create commit
-        new_commit = repo.create_git_commit(
-            message=commit_message,
-            tree=new_tree,
-            parents=[base_commit]
+        if not commit_message:
+            commit_message = f"Commit from AI Code Assistant - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        commit = repo.create_git_commit(
+            commit_message,
+            tree,
+            [base_commit]
         )
         
-        # Update branch reference
-        try:
-            ref = repo.get_git_ref(f"heads/{branch}")
-            ref.edit(new_commit.sha)
-        except GithubException as e:
-            if e.status == 404:
-                # Create new branch
-                repo.create_git_ref(f"refs/heads/{branch}", new_commit.sha)
-                logger.info(f"[GITHUB COMMIT] Created new branch: {branch}")
+        # Update reference to point to new commit
+        ref.edit(commit.sha)
         
-        commit_url = f"https://github.com/{repo_fullname}/commit/{new_commit.sha}"
-        
-        logger.info(f"[GITHUB COMMIT] ✅ Successfully committed {len(attachments)} files")
-        logger.info(f"[GITHUB COMMIT] Commit URL: {commit_url}")
+        logger.info(f"[GITHUB COMMIT] Successfully committed {len(tree_elements)} files to {repo_fullname} on branch {branch}")
         
         return {
             "success": True,
-            "commit_sha": new_commit.sha,
-            "commit_url": commit_url,
-            "files_count": len(attachments),
+            "commit_sha": commit.sha,
             "branch": branch,
+            "files_count": len(tree_elements),
             "message": commit_message
         }
         
-    except GithubException as e:
-        logger.error(f"[GITHUB COMMIT] GitHub API error: {e}")
-        return {
-            "success": False,
-            "error": f"GitHub API error: {str(e)}"
-        }
     except Exception as e:
-        logger.error(f"[GITHUB COMMIT] Error: {e}", exc_info=True)
+        logger.error(f"Failed to commit files: {e}", exc_info=True)
         return {
             "success": False,
             "error": str(e)
-        }
+                }
