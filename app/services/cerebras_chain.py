@@ -138,7 +138,7 @@ async def call_cerebras(messages: List[Dict]) -> str:
         response = await asyncio.to_thread(
             cerebras_client.chat.completions.create,
             messages=messages,
-            model="llama3.1-70b",
+            model="qwen-3-235b-a22b-instruct-2507",
             max_tokens=4096,
             temperature=0.7
         )
@@ -155,7 +155,7 @@ def stream_cerebras(messages: List[Dict]):
     try:
         return cerebras_client.chat.completions.create(
             messages=messages,
-            model="llama3.1-70b",
+            model="qwen-3-235b-a22b-instruct-2507",
             max_tokens=4096,
             temperature=0.7,
             stream=True
