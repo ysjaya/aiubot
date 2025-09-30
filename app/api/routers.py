@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from typing import List, Optional
 from jose import jwt, JWTError
 from datetime import datetime
+from pydantic import BaseModel
 import logging
 
 from app.db import models
@@ -13,7 +14,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# --- Helper Authentication ---
+class ImportReposRequest(BaseModel):
+    project_id: int
+    repos: List[str]
+
 async def get_github_token(authorization: Optional[str] = Header(None)):
     """Extract and validate GitHub token from Authorization header"""
     if not authorization:
@@ -37,7 +41,6 @@ async def get_github_token(authorization: Optional[str] = Header(None)):
         logger.error(f"JWT decode error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# === Project Routes ===
 @router.post("/project", response_model=models.Project)
 def create_project(name: str, session: Session = Depends(get_session)):
     """Create a new project"""
@@ -64,34 +67,28 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Delete related conversations
     conversations = session.exec(select(models.Conversation).where(models.Conversation.project_id == project_id)).all()
     for conv in conversations:
-        # Delete chats in conversation
         chats = session.exec(select(models.Chat).where(models.Chat.conversation_id == conv.id)).all()
         for chat in chats:
             session.delete(chat)
         session.delete(conv)
     
-    # Delete related files
     files = session.exec(select(models.File).where(models.File.project_id == project_id)).all()
     for file in files:
         session.delete(file)
     
-    # Delete project
     session.delete(project)
     session.commit()
     logger.info(f"Deleted project: {project_id}")
     return {"ok": True}
 
-# === Conversation Routes ===
 @router.post("/conversation", response_model=models.Conversation)
 def new_conversation(project_id: int, title: str, session: Session = Depends(get_session)):
     """Create a new conversation in a project"""
     if not title or not title.strip():
         raise HTTPException(status_code=400, detail="Conversation title is required")
     
-    # Check if project exists
     project = session.get(models.Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -120,7 +117,6 @@ def delete_conversation(conv_id: int, session: Session = Depends(get_session)):
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Delete related chats
     chats = session.exec(select(models.Chat).where(models.Chat.conversation_id == conv_id)).all()
     for chat in chats:
         session.delete(chat)
@@ -130,11 +126,9 @@ def delete_conversation(conv_id: int, session: Session = Depends(get_session)):
     logger.info(f"Deleted conversation: {conv_id}")
     return {"ok": True}
 
-# === Chat Routes ===
 @router.get("/conversation/{conv_id}/chats", response_model=List[models.Chat])
 def get_chats(conv_id: int, session: Session = Depends(get_session)):
     """Get all chats in a conversation"""
-    # Check if conversation exists
     conv = session.get(models.Conversation, conv_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -146,7 +140,6 @@ def get_chats(conv_id: int, session: Session = Depends(get_session)):
     ).all()
     return chats
 
-# === File Routes ===
 @router.post("/file/upload/{project_id}", response_model=models.File)
 async def upload_file(
     project_id: int, 
@@ -154,24 +147,17 @@ async def upload_file(
     session: Session = Depends(get_session)
 ):
     """Upload a file to a project"""
-    # Check if project exists
     project = session.get(models.Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Read file content
     content_bytes = await file.read()
     
-    # Try to decode as UTF-8
     try:
         content = content_bytes.decode('utf-8')
     except UnicodeDecodeError:
-        raise HTTPException(
-            status_code=400, 
-            detail="File must be a valid UTF-8 text file"
-        )
+        raise HTTPException(status_code=400, detail="File must be a valid UTF-8 text file")
     
-    # Check if file already exists
     existing_file = session.exec(
         select(models.File)
         .where(models.File.project_id == project_id)
@@ -179,7 +165,6 @@ async def upload_file(
     ).first()
     
     if existing_file:
-        # Update existing file
         existing_file.content = content
         existing_file.updated_at = datetime.utcnow()
         session.add(existing_file)
@@ -188,7 +173,6 @@ async def upload_file(
         logger.info(f"Updated file: {existing_file.id} - {existing_file.path}")
         return existing_file
     else:
-        # Create new file
         db_file = models.File(
             project_id=project_id, 
             path=file.filename, 
@@ -204,7 +188,6 @@ async def upload_file(
 @router.get("/project/{project_id}/files", response_model=List[models.File])
 def get_project_files(project_id: int, session: Session = Depends(get_session)):
     """Get all files in a project"""
-    # Check if project exists
     project = session.get(models.Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -216,7 +199,6 @@ def get_project_files(project_id: int, session: Session = Depends(get_session)):
     ).all()
     return files
 
-# === GitHub Routes ===
 @router.get("/github/repos")
 def get_repos(token: str = Depends(get_github_token)):
     """Get user's GitHub repositories"""
@@ -246,16 +228,13 @@ def import_repo_file(
     token: str = Depends(get_github_token)
 ):
     """Import a file from GitHub repository"""
-    # Check if project exists
     project = session.get(models.Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
     try:
-        # Get file content from GitHub
         content = github_import.get_file_content(repo_fullname, file_path, token)
         
-        # Check if file already exists
         existing_file = session.exec(
             select(models.File)
             .where(models.File.project_id == project_id)
@@ -263,7 +242,6 @@ def import_repo_file(
         ).first()
         
         if existing_file:
-            # Update existing file
             existing_file.content = content
             existing_file.updated_at = datetime.utcnow()
             session.add(existing_file)
@@ -272,7 +250,6 @@ def import_repo_file(
             logger.info(f"Updated imported file: {existing_file.id} - {existing_file.path}")
             return existing_file
         else:
-            # Create new file
             db_file = models.File(
                 project_id=project_id, 
                 path=file_path, 
@@ -287,3 +264,53 @@ def import_repo_file(
     except Exception as e:
         logger.error(f"Failed to import file: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to import file: {str(e)}")
+
+@router.post("/github/import-repos")
+def import_repos(
+    request: ImportReposRequest,
+    session: Session = Depends(get_session),
+    token: str = Depends(get_github_token)
+):
+    """Import multiple repositories"""
+    project = session.get(models.Project, request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    try:
+        total_files = 0
+        for repo_fullname in request.repos:
+            logger.info(f"Importing repository: {repo_fullname}")
+            files_data = github_import.get_all_repo_files(repo_fullname, token)
+            
+            for file_data in files_data:
+                file_path = f"{repo_fullname}/{file_data['path']}"
+                
+                existing_file = session.exec(
+                    select(models.File)
+                    .where(models.File.project_id == request.project_id)
+                    .where(models.File.path == file_path)
+                ).first()
+                
+                if existing_file:
+                    existing_file.content = file_data['content']
+                    existing_file.updated_at = datetime.utcnow()
+                    session.add(existing_file)
+                else:
+                    db_file = models.File(
+                        project_id=request.project_id,
+                        path=file_path,
+                        content=file_data['content'],
+                        updated_at=datetime.utcnow()
+                    )
+                    session.add(db_file)
+                
+                total_files += 1
+            
+            session.commit()
+            logger.info(f"Imported {len(files_data)} files from {repo_fullname}")
+        
+        return {"ok": True, "total_files": total_files, "repos_count": len(request.repos)}
+        
+    except Exception as e:
+        logger.error(f"Failed to import repos: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to import repositories: {str(e)}")
