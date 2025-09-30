@@ -2,11 +2,19 @@ from sqlmodel import create_engine, Session, SQLModel
 from sqlalchemy import text
 from app.core.config import settings
 import logging
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# Main engine for metadata storage
-engine = create_engine(settings.DATABASE_URL, echo=False, pool_pre_ping=True)
+# Main engine for metadata storage with connection pooling
+engine = create_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=3600
+)
 
 def get_session():
     """Get database session"""
@@ -34,8 +42,9 @@ def create_project_database(project_name: str) -> str:
         
         # Create tables in new database
         project_engine = create_engine(
-            settings.DATABASE_URL.replace('/postgres', f'/{db_name}'),
-            echo=False
+            settings.DATABASE_URL.rsplit('/', 1)[0] + f'/{db_name}',
+            echo=False,
+            pool_pre_ping=True
         )
         SQLModel.metadata.create_all(project_engine)
         project_engine.dispose()
@@ -49,6 +58,10 @@ def create_project_database(project_name: str) -> str:
 def delete_project_database(database_name: str):
     """Delete project database"""
     try:
+        # Clear cache for this database
+        if hasattr(get_project_engine, 'cache_info'):
+            get_project_engine.cache_clear()
+        
         # Terminate all connections first
         with engine.connect() as conn:
             conn.execution_options(isolation_level="AUTOCOMMIT")
@@ -70,15 +83,25 @@ def delete_project_database(database_name: str):
         logger.error(f"Failed to delete project database: {e}")
         raise
 
+@lru_cache(maxsize=100)
+def get_project_engine(database_name: str):
+    """Get cached engine for specific project database"""
+    project_url = settings.DATABASE_URL.rsplit('/', 1)[0] + f'/{database_name}'
+    return create_engine(
+        project_url,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=3600
+    )
+
 def get_project_session(database_name: str):
     """Get session for specific project database"""
-    project_url = settings.DATABASE_URL.replace('/postgres', f'/{database_name}')
-    project_engine = create_engine(project_url, echo=False, pool_pre_ping=True)
+    project_engine = get_project_engine(database_name)
     
     with Session(project_engine) as session:
         yield session
-    
-    project_engine.dispose()
 
 def init_main_database():
     """Initialize main metadata database"""
