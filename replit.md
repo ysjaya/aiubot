@@ -10,7 +10,49 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (September 30, 2025)
 
-### Fresh GitHub Clone - Replit Environment Setup (Latest - September 30, 2025)
+### Draft/Versioning System & Code Completeness Validation (Latest - September 30, 2025)
+- **Complete Code Generation Enforcement**: AI now generates 100% complete code without truncation
+  - Added 10-rule system in AI prompts to prevent code truncation (no "...", no placeholders, no stubs)
+  - Increased token limits: 16384 per chunk with unlimited mode supporting auto-continuation up to 100K tokens
+  - Code completeness validator analyzes generated code for common truncation patterns
+  
+- **Draft/Staging System**: AI-modified files go through draft workflow before committing to GitHub
+  - `DraftVersion` table captures every AI-generated file revision with metadata
+  - Automatic completeness validation runs on every draft creation
+  - Drafts with completeness_score >= 0.95 auto-promote to Attachment with LATEST status
+  - Incomplete drafts stay in PENDING status for manual review and approval
+  - Database migration 007 adds draft_versions table with proper indexes
+
+- **Enhanced GitHub Commit Workflow**:
+  - Only files with LATEST status can be committed to GitHub (prevents corrupted commits)
+  - Improved token fallback: provided_token → env GITHUB_TOKEN → settings.GITHUB_TOKEN
+  - Pre-commit validation ensures no empty or truncated files reach GitHub
+  - Clear error messages when no LATEST files available for commit
+  - Comprehensive logging shows file count, char count, and commit status
+
+- **New API Endpoints for Draft Management**:
+  - `GET /api/drafts` - List all drafts for a conversation (with completeness scores)
+  - `GET /api/draft/{id}` - Get full content of specific draft (100% complete code)
+  - `POST /api/draft/{id}/approve` - Manually approve incomplete draft
+  - `POST /api/draft/{id}/reject` - Reject draft
+  - `POST /api/draft/{id}/promote` - Promote approved draft to LATEST Attachment
+  - `GET /api/drafts/pending` - List pending drafts awaiting review
+
+- **Code Validator Features**:
+  - Detects incomplete functions (missing implementations, TODO comments)
+  - Identifies truncation markers ("...", "rest of code", etc.)
+  - Checks for proper file structure (imports, classes, functions)
+  - Validates minimum code length and complexity
+  - Returns completeness_score (0-1) with detailed issue list
+
+- **AI Chain Improvements**:
+  - `intelligent_file_update()` function uses draft system with validation
+  - Auto-detection of code blocks that should update files
+  - Streaming with unlimited mode supports multi-continuation for long files
+  - Full response saved to Chat table with context tracking
+  - Modified files tracked in files_modified JSON field
+
+### Fresh GitHub Clone - Replit Environment Setup (September 30, 2025)
 - **GitHub Import Complete**: Fresh clone from GitHub successfully configured for Replit environment
   - Python 3.11 and Node.js 20 toolchains installed
   - All Python dependencies installed from requirements.txt (FastAPI, SQLModel, Cerebras SDK, etc.)
@@ -92,8 +134,6 @@ Preferred communication style: Simple, everyday language.
   - Configured Vite proxy to work correctly with Replit environment
   - Updated .env file to use empty API_URL for same-origin requests
   - Backend properly serves both development and production frontend builds
-
-## Recent Changes (September 30, 2025)
 
 ### GitHub Integration & UI Improvements
 - **GitHub Import**: Replaced file upload functionality with GitHub repository import
