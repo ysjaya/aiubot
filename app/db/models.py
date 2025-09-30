@@ -13,7 +13,7 @@ class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    conversations: List["Conversation"] = Relationship(back_populates="project", cascade_delete=True)
+    conversations: List["Conversation"] = Relationship(back_populates="project")
 
 class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -21,8 +21,8 @@ class Conversation(SQLModel, table=True):
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     project: Optional[Project] = Relationship(back_populates="conversations")
-    chats: List["Chat"] = Relationship(back_populates="conversation", cascade_delete=True)
-    attachments: List["Attachment"] = Relationship(back_populates="conversation", cascade_delete=True)
+    chats: List["Chat"] = Relationship(back_populates="conversation")
+    attachments: List["Attachment"] = Relationship(back_populates="conversation")
 
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
