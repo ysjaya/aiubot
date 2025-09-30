@@ -1,8 +1,7 @@
 import { state } from './state.js';
 import { api } from './api.js';
-import { showToast, renderProjects, renderConversations, renderFiles, renderChats, closeSidebars } from './ui.js';
+import { showToast, renderProjects, renderConversations, renderAttachments, renderChats, closeSidebars } from './ui.js';
 import { dom } from './dom.js';
-import { loginWithGitHub, isAuthenticated } from './auth.js';
 
 export const actions = {
     loadProjects: async () => {
@@ -27,13 +26,17 @@ export const actions = {
         }
     },
 
-    loadFiles: async () => {
-        if (!state.currentProjectId) return renderFiles([]);
+    loadAttachments: async () => {
+        if (!state.currentConvId) {
+            state.attachments = [];
+            return renderAttachments([]);
+        }
         try {
-            const files = await api.get(`/project/${state.currentProjectId}/files`);
-            renderFiles(files);
+            const attachments = await api.get(`/conversation/${state.currentConvId}/attachments`);
+            state.attachments = attachments;
+            renderAttachments(attachments);
         } catch (err) {
-            renderFiles([]);
+            renderAttachments([]);
         }
     },
 
@@ -62,15 +65,17 @@ export const actions = {
         try {
             const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title.trim())}`);
             state.currentConvId = newConv.id;
+            state.attachments = [];
             await actions.loadConversations();
             renderChats([]);
+            renderAttachments([]);
         } catch (err) {
             showToast('Failed to create conversation', 'error');
         }
     },
 
     handleDeleteProject: async (projectId) => {
-        if (!confirm("Delete this project? All data will be lost!")) return;
+        if (!confirm("Delete this project? All conversations and files will be permanently deleted!")) return;
         
         try {
             await api.delete(`/project/${projectId}`);
@@ -78,9 +83,10 @@ export const actions = {
                 state.currentProjectId = null;
                 state.currentConvId = null;
                 state.conversations = [];
+                state.attachments = [];
                 dom.chatMessages.classList.add('hidden');
                 dom.welcomeMessage.classList.remove('hidden');
-                await actions.loadFiles();
+                renderAttachments([]);
             }
             await actions.loadProjects();
             renderConversations();
@@ -91,14 +97,16 @@ export const actions = {
     },
 
     handleDeleteConversation: async (convId) => {
-        if (!confirm("Delete this conversation?")) return;
+        if (!confirm("Delete this conversation and all its attachments?")) return;
         
         try {
             await api.delete(`/conversation/${convId}`);
             if (state.currentConvId === convId) {
                 state.currentConvId = null;
+                state.attachments = [];
                 dom.chatMessages.classList.add('hidden');
                 dom.welcomeMessage.classList.remove('hidden');
+                renderAttachments([]);
             }
             await actions.loadConversations();
             showToast('Conversation deleted');
@@ -124,6 +132,7 @@ export const actions = {
         state.currentProjectId = projectId;
         state.currentConvId = null;
         state.conversations = [];
+        state.attachments = [];
         
         renderProjects();
         renderConversations();
@@ -133,7 +142,7 @@ export const actions = {
         dom.welcomeMessage.classList.remove('hidden');
         
         await actions.loadConversations();
-        await actions.loadFiles();
+        renderAttachments([]);
         closeSidebars();
     },
 
@@ -157,19 +166,26 @@ export const actions = {
         try {
             const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
             renderChats(chats);
+            await actions.loadAttachments();
         } catch (err) {
-            showToast('Failed to load chats', 'error');
+            showToast('Failed to load conversation', 'error');
         }
         
         closeSidebars();
     },
 
-    handleFileUpload: async (event) => {
+    handleFileAttach: async (event) => {
         const file = event.target.files[0];
         if (!file) return;
         
-        if (!state.currentProjectId) {
-            showToast('Select a project first', 'error');
+        if (!state.currentConvId) {
+            showToast('Select a conversation first', 'error');
+            return;
+        }
+        
+        // Check file size (max 1MB)
+        if (file.size > 1_000_000) {
+            showToast('File too large (max 1MB)', 'error');
             return;
         }
         
@@ -177,94 +193,90 @@ export const actions = {
         formData.append('file', file);
         
         try {
-            await fetch(`/api/file/upload/${state.currentProjectId}`, { 
-                method: 'POST', 
-                body: formData 
+            await fetch(`/api/conversation/${state.currentConvId}/attach`, {
+                method: 'POST',
+                body: formData
             });
-            showToast('File uploaded');
-            await actions.loadFiles();
+            showToast(`✅ Attached: ${file.name}`);
+            await actions.loadAttachments();
         } catch (err) {
-            showToast('File upload failed', 'error');
+            showToast('Failed to attach file', 'error');
         }
         
-        dom.fileUploadInput.value = '';
+        dom.fileAttachInput.value = '';
     },
 
-    handleGitHubImportClick: async () => {
-        if (!state.currentProjectId) {
-            showToast('Select a project first', 'error');
-            return;
-        }
-
-        if (!isAuthenticated()) {
-            if (confirm('Login with GitHub first?')) {
-                loginWithGitHub();
-            }
-            return;
-        }
-
-        dom.githubModal.showModal();
-        dom.modalTitle.textContent = "Your Repositories";
-        dom.modalContent.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">Loading...</div>';
+    handleDeleteAttachment: async (fileId) => {
+        if (!confirm('Delete this file and all its versions?')) return;
         
         try {
-            const repos = await api.get('/github/repos', true);
-            state.githubRepos = repos;
-            state.selectedRepos = new Set();
+            await api.delete(`/attachment/${fileId}`);
+            showToast('File deleted');
+            await actions.loadAttachments();
+        } catch (err) {
+            showToast('Failed to delete file', 'error');
+        }
+    },
+
+    handleDownloadAttachment: async (fileId, filename) => {
+        try {
+            const response = await fetch(`/api/attachment/${fileId}/download`);
+            if (!response.ok) throw new Error('Download failed');
             
-            let html = '<div>';
-            repos.forEach(repo => {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showToast(`Downloaded: ${filename}`);
+        } catch (err) {
+            showToast('Download failed', 'error');
+        }
+    },
+
+    handleViewVersions: async (fileId) => {
+        try {
+            const versions = await api.get(`/attachment/${fileId}/versions`);
+            
+            dom.modalTitle.textContent = "File Versions";
+            
+            let html = '<div class="versions-list">';
+            versions.forEach(v => {
+                const statusBadge = v.status === 'latest' ? '✨ Latest' : 
+                                  v.status === 'modified' ? '✏️ Modified' : 
+                                  '📄 Original';
+                const timestamp = new Date(v.updated_at).toLocaleString();
+                
                 html += `
-                    <div class="repo-item" data-repo="${repo.full_name}">
-                        <input type="checkbox" class="checkbox repo-checkbox" data-repo="${repo.full_name}">
-                        <span>${repo.full_name}</span>
+                    <div class="version-item">
+                        <div class="version-header">
+                            <span class="version-badge">${statusBadge}</span>
+                            <span class="version-num">v${v.version}</span>
+                            <span class="version-time">${timestamp}</span>
+                        </div>
+                        ${v.modification_summary ? `<div class="version-summary">${v.modification_summary}</div>` : ''}
+                        <div class="version-actions">
+                            <button class="btn-download" onclick="actions.handleDownloadAttachment(${v.id}, '${v.filename}')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
                     </div>
                 `;
             });
-            html += '<button class="btn-import" id="import-repos-btn" disabled>Import Selected</button></div>';
+            html += '</div>';
             
             dom.modalContent.innerHTML = html;
-            
-            dom.modalContent.querySelectorAll('.repo-checkbox').forEach(cb => {
-                cb.addEventListener('change', (e) => {
-                    const repo = e.target.dataset.repo;
-                    if (e.target.checked) {
-                        state.selectedRepos.add(repo);
-                    } else {
-                        state.selectedRepos.delete(repo);
-                    }
-                    document.getElementById('import-repos-btn').disabled = state.selectedRepos.size === 0;
-                });
-            });
-            
-            document.getElementById('import-repos-btn').addEventListener('click', actions.handleImportRepos);
-            
+            dom.githubModal.showModal();
         } catch (err) {
-            dom.modalContent.innerHTML = '<div style="padding:20px;color:var(--error-color);">Failed to load repositories. <button class="btn-import" onclick="window.location.href=\'/api/auth/login\'">Login Again</button></div>';
-        }
-    },
-
-    handleImportRepos: async () => {
-        if (state.selectedRepos.size === 0) return;
-        
-        const importBtn = document.getElementById('import-repos-btn');
-        importBtn.disabled = true;
-        importBtn.textContent = 'Importing...';
-        
-        try {
-            const reposArray = Array.from(state.selectedRepos);
-            await api.post(`/github/import-repos`, {
-                project_id: state.currentProjectId,
-                repos: reposArray
-            }, true);
-            
-            showToast(`Imported ${reposArray.length} repository(ies)`);
-            await actions.loadFiles();
-            dom.githubModal.close();
-        } catch (err) {
-            showToast('Failed to import repositories', 'error');
-            importBtn.disabled = false;
-            importBtn.textContent = 'Import Selected';
+            showToast('Failed to load versions', 'error');
         }
     }
 };
+
+// Expose actions globally for onclick handlers
+window.actions = actions;
