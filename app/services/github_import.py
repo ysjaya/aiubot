@@ -1,0 +1,72 @@
+from github import Github, Auth, GithubException
+import logging
+
+logger = logging.getLogger(__name__)
+
+def get_user_repos(token: str):
+    """Get user's GitHub repositories"""
+    try:
+        auth = Auth.Token(token)
+        g = Github(auth=auth)
+        user = g.get_user()
+        
+        repos = []
+        for repo in user.get_repos(sort="updated"):
+            repos.append({"full_name": repo.full_name})
+        
+        logger.info(f"Retrieved {len(repos)} repositories")
+        return repos
+    except GithubException as e:
+        logger.error(f"GitHub API error: {e}")
+        raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+    except Exception as e:
+        logger.error(f"Error getting repos: {e}")
+        raise
+
+def list_files(repo_fullname: str, token: str):
+    """List all files in a GitHub repository"""
+    try:
+        auth = Auth.Token(token)
+        g = Github(auth=auth)
+        repo = g.get_repo(repo_fullname)
+        
+        files = []
+        contents = repo.get_contents("")
+        
+        while contents:
+            file_content = contents.pop(0)
+            if file_content.type == "dir":
+                contents.extend(repo.get_contents(file_content.path))
+            else:
+                files.append(file_content.path)
+        
+        logger.info(f"Listed {len(files)} files from {repo_fullname}")
+        return files
+    except GithubException as e:
+        logger.error(f"GitHub API error listing files: {e}")
+        raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+    except Exception as e:
+        logger.error(f"Error listing files for {repo_fullname}: {e}")
+        raise
+
+def get_file_content(repo_fullname: str, file_path: str, token: str):
+    """Get content of a specific file from GitHub repository"""
+    try:
+        auth = Auth.Token(token)
+        g = Github(auth=auth)
+        repo = g.get_repo(repo_fullname)
+        
+        file_content = repo.get_contents(file_path)
+        content = file_content.decoded_content.decode('utf-8')
+        
+        logger.info(f"Retrieved file: {file_path} from {repo_fullname}")
+        return content
+    except UnicodeDecodeError:
+        logger.error(f"File is not UTF-8 encoded: {file_path}")
+        raise Exception("File is not a valid text file (UTF-8 encoding required)")
+    except GithubException as e:
+        logger.error(f"GitHub API error getting file: {e}")
+        raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+    except Exception as e:
+        logger.error(f"Error getting file {file_path} from {repo_fullname}: {e}")
+        raise
