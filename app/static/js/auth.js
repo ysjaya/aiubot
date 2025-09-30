@@ -7,7 +7,7 @@ export function checkAuth() {
     const error = urlParams.get('error');
     
     if (error) {
-        showToast('GitHub authentication failed. Please try again.', 'error');
+        showToast('GitHub authentication failed', 'error');
         window.history.replaceState({}, document.title, "/");
         return;
     }
@@ -15,7 +15,7 @@ export function checkAuth() {
     if (token) {
         state.githubToken = token;
         localStorage.setItem('github_token', token);
-        showToast('Successfully authenticated with GitHub!', 'success');
+        showToast('Successfully authenticated with GitHub');
         window.history.replaceState({}, document.title, "/");
         return;
     }
@@ -23,7 +23,6 @@ export function checkAuth() {
     const storedToken = localStorage.getItem('github_token');
     if (storedToken) {
         state.githubToken = storedToken;
-        console.log('GitHub token loaded');
     }
 }
 
@@ -34,7 +33,7 @@ export function loginWithGitHub() {
 export function logout() {
     state.githubToken = null;
     localStorage.removeItem('github_token');
-    showToast('Logged out successfully', 'success');
+    showToast('Logged out');
 }
 
 export function isAuthenticated() {
