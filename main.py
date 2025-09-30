@@ -1,5 +1,5 @@
-from fastapi import FastAPI, WebSocket, Depends, Query, APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, WebSocket, Depends, Query
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
@@ -8,16 +8,22 @@ import json
 import logging
 
 from app.api.routers import router as api_router
-from app.api.auth import router as auth_router 
 from app.db.database import engine, get_session
-from app.services import cerebras_chain, web_tools
+from app.services import cerebras_chain
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = FastAPI(title="Personal AI Assistant", version="2.0.0")
+app = FastAPI(
+    title="AI Coding Assistant",
+    version="3.0.0",
+    description="Production-ready AI assistant with file versioning"
+)
 
 # CORS
 app.add_middleware(
@@ -31,55 +37,34 @@ app.add_middleware(
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Tools router
-tools_router = APIRouter()
-
-@tools_router.get("/websearch")
-def websearch(q: str):
-    try:
-        return web_tools.search_web(q)
-    except Exception as e:
-        logger.error(f"Web search error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@tools_router.get("/scrape")
-def scrape(url: str):
-    try:
-        return web_tools.scrape_url(url)
-    except Exception as e:
-        logger.error(f"Scraping error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
+# API routes
 app.include_router(api_router, prefix="/api")
-app.include_router(tools_router, prefix="/api/tools") 
-app.include_router(auth_router, prefix="/api/auth")
 
 @app.on_event("startup")
 def on_startup():
-    logger.info("Starting application...")
+    logger.info("🚀 Starting AI Assistant...")
     SQLModel.metadata.create_all(engine)
-    logger.info("Database ready")
+    logger.info("✅ Database ready")
 
 @app.get("/")
 async def read_index():
-    response = FileResponse('app/templates/index.html')
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+    return FileResponse('app/templates/index.html')
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "2.0.0"}
+    return {"status": "healthy", "version": "3.0.0"}
 
 @app.websocket("/ws/ai")
-async def ws_ai(ws: WebSocket, project_id: int = Query(...), conversation_id: int = Query(...)):
+async def ws_ai(
+    ws: WebSocket, 
+    project_id: int = Query(...), 
+    conversation_id: int = Query(...)
+):
     await ws.accept()
-    logger.info(f"WebSocket connected: project={project_id}, conv={conversation_id}")
+    logger.info(f"📡 WebSocket: project={project_id}, conv={conversation_id}")
     
     try:
         data = await ws.receive_json()
-        logger.info(f"Received: {data.get('msg', '')[:50]}...")
         
         if not data.get("msg"):
             await ws.send_text(json.dumps({"status": "error", "message": "Empty message"}))
@@ -88,16 +73,14 @@ async def ws_ai(ws: WebSocket, project_id: int = Query(...), conversation_id: in
         messages = [{"role": "user", "content": data["msg"]}]
         
         with next(get_session()) as session:
-            logger.info("Starting AI chain stream...")
             async for chunk in cerebras_chain.ai_chain_stream(messages, project_id, conversation_id, session):
                 await ws.send_text(chunk)
-            logger.info("AI chain completed")
             
     except Exception as e:
-        logger.error(f"WebSocket error: {e}", exc_info=True)
+        logger.error(f"❌ WebSocket error: {e}", exc_info=True)
         try:
-            await ws.send_text(json.dumps({"status": "error", "message": f"Server error: {str(e)}"}))
+            await ws.send_text(json.dumps({"status": "error", "message": str(e)}))
         except:
             pass
     finally:
-        logger.info("WebSocket closed")
+        logger.info("🔌 WebSocket closed")
