@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Header
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List, Optional
 from jose import jwt, JWTError
 from datetime import datetime
 from pydantic import BaseModel
 import logging
+import json
+import io
 
 from app.db import models
 from app.db.database import get_session
-from app.services import github_import
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,8 @@ async def get_github_token(authorization: Optional[str] = Header(None)):
         logger.error(f"JWT decode error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# ==================== PROJECT MANAGEMENT ====================
+
 @router.post("/project", response_model=models.Project)
 def create_project(name: str, session: Session = Depends(get_session)):
     """Create a new project"""
@@ -62,26 +66,17 @@ def list_projects(session: Session = Depends(get_session)):
 
 @router.delete("/project/{project_id}")
 def delete_project(project_id: int, session: Session = Depends(get_session)):
-    """Delete a project and all its conversations and files"""
+    """Delete a project and all its data (CASCADE)"""
     project = session.get(models.Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    conversations = session.exec(select(models.Conversation).where(models.Conversation.project_id == project_id)).all()
-    for conv in conversations:
-        chats = session.exec(select(models.Chat).where(models.Chat.conversation_id == conv.id)).all()
-        for chat in chats:
-            session.delete(chat)
-        session.delete(conv)
-    
-    files = session.exec(select(models.File).where(models.File.project_id == project_id)).all()
-    for file in files:
-        session.delete(file)
-    
     session.delete(project)
     session.commit()
-    logger.info(f"Deleted project: {project_id}")
+    logger.info(f"Deleted project: {project_id} (CASCADE)")
     return {"ok": True}
+
+# ==================== CONVERSATION MANAGEMENT ====================
 
 @router.post("/conversation", response_model=models.Conversation)
 def new_conversation(project_id: int, title: str, session: Session = Depends(get_session)):
@@ -112,18 +107,14 @@ def list_conversations(project_id: int, session: Session = Depends(get_session))
 
 @router.delete("/conversation/{conv_id}")
 def delete_conversation(conv_id: int, session: Session = Depends(get_session)):
-    """Delete a conversation and all its chats"""
+    """Delete a conversation and all its data (CASCADE)"""
     conv = session.get(models.Conversation, conv_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    chats = session.exec(select(models.Chat).where(models.Chat.conversation_id == conv_id)).all()
-    for chat in chats:
-        session.delete(chat)
-    
     session.delete(conv)
     session.commit()
-    logger.info(f"Deleted conversation: {conv_id}")
+    logger.info(f"Deleted conversation: {conv_id} (CASCADE)")
     return {"ok": True}
 
 @router.get("/conversation/{conv_id}/chats", response_model=List[models.Chat])
@@ -140,177 +131,204 @@ def get_chats(conv_id: int, session: Session = Depends(get_session)):
     ).all()
     return chats
 
-@router.post("/file/upload/{project_id}", response_model=models.File)
-async def upload_file(
-    project_id: int, 
-    file: UploadFile = FastAPIFile(...), 
+# ==================== ATTACHMENT MANAGEMENT (NEW) ====================
+
+@router.post("/conversation/{conv_id}/attach", response_model=models.Attachment)
+async def attach_file(
+    conv_id: int,
+    file: UploadFile = FastAPIFile(...),
     session: Session = Depends(get_session)
 ):
-    """Upload a file to a project"""
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    """Attach a file to conversation (like Claude AI)"""
+    conv = session.get(models.Conversation, conv_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     
+    # Read file content
     content_bytes = await file.read()
     
+    # Try to decode as text
     try:
         content = content_bytes.decode('utf-8')
     except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="File must be a valid UTF-8 text file")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 text")
     
-    existing_file = session.exec(
-        select(models.File)
-        .where(models.File.project_id == project_id)
-        .where(models.File.path == file.filename)
+    # Check file size (max 1MB)
+    if len(content_bytes) > 1_000_000:
+        raise HTTPException(status_code=400, detail="File too large (max 1MB)")
+    
+    # Create attachment
+    attachment = models.Attachment(
+        conversation_id=conv_id,
+        filename=file.filename,
+        original_filename=file.filename,
+        content=content,
+        mime_type=file.content_type or "text/plain",
+        size_bytes=len(content_bytes),
+        status=models.FileStatus.ORIGINAL,
+        version=1
+    )
+    
+    session.add(attachment)
+    session.commit()
+    session.refresh(attachment)
+    
+    logger.info(f"Attached file: {attachment.id} - {attachment.filename} to conv {conv_id}")
+    return attachment
+
+@router.get("/conversation/{conv_id}/attachments", response_model=List[models.Attachment])
+def list_attachments(conv_id: int, session: Session = Depends(get_session)):
+    """List all attachments in a conversation"""
+    conv = session.get(models.Conversation, conv_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Get only latest version of each file
+    attachments = session.exec(
+        select(models.Attachment)
+        .where(models.Attachment.conversation_id == conv_id)
+        .where(models.Attachment.status == models.FileStatus.LATEST)
+        .order_by(models.Attachment.created_at.desc())
+    ).all()
+    
+    # If no LATEST, get ORIGINAL
+    if not attachments:
+        attachments = session.exec(
+            select(models.Attachment)
+            .where(models.Attachment.conversation_id == conv_id)
+            .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+            .order_by(models.Attachment.created_at.desc())
+        ).all()
+    
+    return attachments
+
+@router.get("/attachment/{file_id}/download")
+def download_attachment(file_id: int, session: Session = Depends(get_session)):
+    """Download a file attachment"""
+    attachment = session.get(models.Attachment, file_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Create file stream
+    file_stream = io.BytesIO(attachment.content.encode('utf-8'))
+    
+    # Determine filename with status
+    status_prefix = {
+        models.FileStatus.ORIGINAL: "",
+        models.FileStatus.MODIFIED: "modified_",
+        models.FileStatus.LATEST: "latest_"
+    }.get(attachment.status, "")
+    
+    filename = f"{status_prefix}{attachment.filename}"
+    
+    return StreamingResponse(
+        file_stream,
+        media_type=attachment.mime_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(attachment.size_bytes)
+        }
+    )
+
+@router.delete("/attachment/{file_id}")
+def delete_attachment(file_id: int, session: Session = Depends(get_session)):
+    """Delete a file attachment and all its versions"""
+    attachment = session.get(models.Attachment, file_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Delete all versions related to this file
+    if attachment.parent_file_id is None:
+        # This is an original file, delete all its children
+        children = session.exec(
+            select(models.Attachment)
+            .where(models.Attachment.parent_file_id == file_id)
+        ).all()
+        for child in children:
+            session.delete(child)
+    
+    session.delete(attachment)
+    session.commit()
+    
+    logger.info(f"Deleted attachment: {file_id}")
+    return {"ok": True}
+
+@router.get("/attachment/{file_id}/versions", response_model=List[models.Attachment])
+def get_file_versions(file_id: int, session: Session = Depends(get_session)):
+    """Get all versions of a file"""
+    attachment = session.get(models.Attachment, file_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Find root file
+    root_id = attachment.parent_file_id if attachment.parent_file_id else attachment.id
+    
+    # Get all versions
+    versions = session.exec(
+        select(models.Attachment)
+        .where(
+            (models.Attachment.id == root_id) | 
+            (models.Attachment.parent_file_id == root_id)
+        )
+        .order_by(models.Attachment.version.asc())
+    ).all()
+    
+    return versions
+
+@router.post("/attachment/{file_id}/update", response_model=models.Attachment)
+def update_attachment_content(
+    file_id: int,
+    content: str,
+    modification_summary: Optional[str] = None,
+    session: Session = Depends(get_session)
+):
+    """Update file content and create new version"""
+    original = session.get(models.Attachment, file_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Mark old LATEST as MODIFIED
+    old_latest = session.exec(
+        select(models.Attachment)
+        .where(models.Attachment.conversation_id == original.conversation_id)
+        .where(models.Attachment.filename == original.filename)
+        .where(models.Attachment.status == models.FileStatus.LATEST)
     ).first()
     
-    if existing_file:
-        existing_file.content = content
-        existing_file.updated_at = datetime.utcnow()
-        session.add(existing_file)
-        session.commit()
-        session.refresh(existing_file)
-        logger.info(f"Updated file: {existing_file.id} - {existing_file.path}")
-        return existing_file
-    else:
-        db_file = models.File(
-            project_id=project_id, 
-            path=file.filename, 
-            content=content,
-            updated_at=datetime.utcnow()
+    if old_latest:
+        old_latest.status = models.FileStatus.MODIFIED
+        session.add(old_latest)
+    
+    # Find root file
+    root_id = original.parent_file_id if original.parent_file_id else original.id
+    
+    # Get max version
+    max_version = session.exec(
+        select(models.Attachment)
+        .where(
+            (models.Attachment.id == root_id) | 
+            (models.Attachment.parent_file_id == root_id)
         )
-        session.add(db_file)
-        session.commit()
-        session.refresh(db_file)
-        logger.info(f"Created file: {db_file.id} - {db_file.path}")
-        return db_file
-
-@router.get("/project/{project_id}/files", response_model=List[models.File])
-def get_project_files(project_id: int, session: Session = Depends(get_session)):
-    """Get all files in a project"""
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    files = session.exec(
-        select(models.File)
-        .where(models.File.project_id == project_id)
-        .order_by(models.File.path.asc())
     ).all()
-    return files
-
-@router.get("/github/repos")
-def get_repos(token: str = Depends(get_github_token)):
-    """Get user's GitHub repositories"""
-    try:
-        repos = github_import.get_user_repos(token)
-        return repos
-    except Exception as e:
-        logger.error(f"Failed to get repos: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get repositories: {str(e)}")
-
-@router.get("/github/repo-files")
-def get_repo_files(repo_fullname: str, token: str = Depends(get_github_token)):
-    """Get files in a GitHub repository"""
-    try:
-        files = github_import.list_files(repo_fullname, token)
-        return files
-    except Exception as e:
-        logger.error(f"Failed to list files: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list files: {str(e)}")
-
-@router.post("/github/import-file", response_model=models.File)
-def import_repo_file(
-    project_id: int,
-    repo_fullname: str,
-    file_path: str,
-    session: Session = Depends(get_session),
-    token: str = Depends(get_github_token)
-):
-    """Import a file from GitHub repository"""
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    next_version = max([f.version for f in max_version]) + 1 if max_version else 2
     
-    try:
-        content = github_import.get_file_content(repo_fullname, file_path, token)
-        
-        existing_file = session.exec(
-            select(models.File)
-            .where(models.File.project_id == project_id)
-            .where(models.File.path == file_path)
-        ).first()
-        
-        if existing_file:
-            existing_file.content = content
-            existing_file.updated_at = datetime.utcnow()
-            session.add(existing_file)
-            session.commit()
-            session.refresh(existing_file)
-            logger.info(f"Updated imported file: {existing_file.id} - {existing_file.path}")
-            return existing_file
-        else:
-            db_file = models.File(
-                project_id=project_id, 
-                path=file_path, 
-                content=content, 
-                updated_at=datetime.utcnow()
-            )
-            session.add(db_file)
-            session.commit()
-            session.refresh(db_file)
-            logger.info(f"Created imported file: {db_file.id} - {db_file.path}")
-            return db_file
-    except Exception as e:
-        logger.error(f"Failed to import file: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to import file: {str(e)}")
-
-@router.post("/github/import-repos")
-def import_repos(
-    request: ImportReposRequest,
-    session: Session = Depends(get_session),
-    token: str = Depends(get_github_token)
-):
-    """Import multiple repositories"""
-    project = session.get(models.Project, request.project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    # Create new version
+    new_attachment = models.Attachment(
+        conversation_id=original.conversation_id,
+        filename=original.filename,
+        original_filename=original.original_filename,
+        content=content,
+        mime_type=original.mime_type,
+        size_bytes=len(content.encode('utf-8')),
+        status=models.FileStatus.LATEST,
+        version=next_version,
+        parent_file_id=root_id,
+        modification_summary=modification_summary
+    )
     
-    try:
-        total_files = 0
-        for repo_fullname in request.repos:
-            logger.info(f"Importing repository: {repo_fullname}")
-            files_data = github_import.get_all_repo_files(repo_fullname, token)
-            
-            for file_data in files_data:
-                file_path = f"{repo_fullname}/{file_data['path']}"
-                
-                existing_file = session.exec(
-                    select(models.File)
-                    .where(models.File.project_id == request.project_id)
-                    .where(models.File.path == file_path)
-                ).first()
-                
-                if existing_file:
-                    existing_file.content = file_data['content']
-                    existing_file.updated_at = datetime.utcnow()
-                    session.add(existing_file)
-                else:
-                    db_file = models.File(
-                        project_id=request.project_id,
-                        path=file_path,
-                        content=file_data['content'],
-                        updated_at=datetime.utcnow()
-                    )
-                    session.add(db_file)
-                
-                total_files += 1
-            
-            session.commit()
-            logger.info(f"Imported {len(files_data)} files from {repo_fullname}")
-        
-        return {"ok": True, "total_files": total_files, "repos_count": len(request.repos)}
-        
-    except Exception as e:
-        logger.error(f"Failed to import repos: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to import repositories: {str(e)}")
+    session.add(new_attachment)
+    session.commit()
+    session.refresh(new_attachment)
+    
+    logger.info(f"Updated attachment: {new_attachment.id} (v{next_version}) - {new_attachment.filename}")
+    return new_attachment
