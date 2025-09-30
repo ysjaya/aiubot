@@ -10,7 +10,31 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (September 30, 2025)
 
-### Replit Environment Setup (Latest - September 30, 2025)
+### GitHub Re-Import and Model Update (Latest - September 30, 2025)
+- **GitHub Import Complete**: Fresh clone from GitHub successfully configured for Replit
+  - Python 3.11 and Node.js 20 toolchains verified and running
+  - All Python and npm dependencies installed successfully
+  - PostgreSQL database connected via existing Supabase configuration
+  - Frontend built for production and tested
+
+- **AI Model Update**: Updated Cerebras AI models
+  - Changed from "llama3.1-70b" to "qwen-3-235b-a22b-instruct-2507"
+  - Updated both streaming and non-streaming API calls
+  - Model configured for 4096 max tokens with 0.7 temperature
+
+- **Deployment Configuration**: 
+  - Autoscale deployment configured with proper build and run commands
+  - Build step: Installs dependencies (pip + npm) and builds React frontend
+  - Run step: Uses start_production.sh with dynamic PORT environment variable
+  - Production server binds to 0.0.0.0 with PORT from environment (default: 5000)
+
+- **Development Workflow**:
+  - "Dev Server" workflow configured and running successfully
+  - Backend on localhost:8000, frontend on 0.0.0.0:5000
+  - Vite proxy properly configured for API and WebSocket connections
+  - All features tested and verified working: UI loads, database connects, services initialize
+
+### Replit Environment Setup (Previous - September 30, 2025)
 - **Development Configuration**: Successfully configured for Replit environment
   - Python 3.11 and Node.js 20 toolchains installed
   - PostgreSQL database created and initialized
