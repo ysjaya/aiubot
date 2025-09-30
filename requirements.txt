@@ -1,32 +1,28 @@
-# Core Framework
+# FastAPI and server
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 
-# AI/ML APIs
-cerebras-cloud-sdk==1.3.0
-openai==1.12.0
-
 # Database
 sqlmodel==0.0.14
 psycopg2-binary==2.9.9
+alembic==1.13.1
 
-# Authentication & Security
+# AI/LLM
+cerebras-cloud-sdk==1.0.0
+openai==1.10.0
+
+# Security and auth
 python-jose[cryptography]==3.3.0
-pydantic-settings==2.1.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
 
-# GitHub Integration
-PyGithub==2.1.1
-
-# Web Scraping & Tools
-requests==2.31.0
+# Web scraping and search
 beautifulsoup4==4.12.3
-trafilatura==1.6.3
-httpx==0.26.0
+requests==2.31.0
+lxml==5.1.0
 
 # Utilities
-python-dotenv==1.0.0
-numpy==1.26.3
-
-# Logging (optional but recommended)
-colorlog==6.8.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dateutil==2.8.2
