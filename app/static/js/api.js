@@ -1,16 +1,8 @@
-import { state } from './state.js';
-
 export const api = {
-    get: async (url, auth = false) => {
-        const headers = {};
-        if (auth && state.githubToken) {
-            headers['Authorization'] = `Bearer ${state.githubToken}`;
-        }
-        
+    get: async (url) => {
         try {
             const response = await fetch(`/api${url}`, { 
                 method: 'GET',
-                headers,
                 cache: 'no-cache'
             });
             
@@ -19,9 +11,7 @@ export const api = {
                 try {
                     const error = await response.json();
                     errorMessage = error.detail || errorMessage;
-                } catch (e) {
-                    // If can't parse JSON, use default message
-                }
+                } catch (e) {}
                 throw new Error(errorMessage);
             }
             
@@ -32,19 +22,11 @@ export const api = {
         }
     },
 
-    post: async (url, data = {}, auth = false) => {
-        const headers = { 
-            'Content-Type': 'application/json' 
-        };
-        
-        if (auth && state.githubToken) {
-            headers['Authorization'] = `Bearer ${state.githubToken}`;
-        }
-        
+    post: async (url, data = {}) => {
         try {
             const response = await fetch(`/api${url}`, {
                 method: 'POST',
-                headers,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
                 cache: 'no-cache'
             });
@@ -54,9 +36,7 @@ export const api = {
                 try {
                     const error = await response.json();
                     errorMessage = error.detail || errorMessage;
-                } catch (e) {
-                    // If can't parse JSON, use default message
-                }
+                } catch (e) {}
                 throw new Error(errorMessage);
             }
             
@@ -67,16 +47,10 @@ export const api = {
         }
     },
 
-    delete: async (url, auth = false) => {
-        const headers = {};
-        if (auth && state.githubToken) {
-            headers['Authorization'] = `Bearer ${state.githubToken}`;
-        }
-        
+    delete: async (url) => {
         try {
             const response = await fetch(`/api${url}`, { 
                 method: 'DELETE',
-                headers,
                 cache: 'no-cache'
             });
             
@@ -85,9 +59,7 @@ export const api = {
                 try {
                     const error = await response.json();
                     errorMessage = error.detail || errorMessage;
-                } catch (e) {
-                    // If can't parse JSON, use default message
-                }
+                } catch (e) {}
                 throw new Error(errorMessage);
             }
             
