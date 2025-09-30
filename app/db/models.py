@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, Integer, ForeignKey
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -18,7 +19,7 @@ class Project(SQLModel, table=True):
 
 class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: int = Field(foreign_key="project.id", ondelete="CASCADE")
+    project_id: int = Field(sa_column=Column(Integer, ForeignKey("project.id", ondelete="CASCADE")))
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -29,7 +30,7 @@ class Conversation(SQLModel, table=True):
 
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    conversation_id: int = Field(foreign_key="conversation.id", ondelete="CASCADE")
+    conversation_id: int = Field(sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE")))
     user: str
     message: str
     ai_response: str
@@ -44,7 +45,7 @@ class Chat(SQLModel, table=True):
 class Attachment(SQLModel, table=True):
     """File attachments per conversation with versioning"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    conversation_id: int = Field(foreign_key="conversation.id", ondelete="CASCADE")
+    conversation_id: int = Field(sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE")))
     
     # File info
     filename: str
@@ -56,7 +57,7 @@ class Attachment(SQLModel, table=True):
     # Versioning
     status: FileStatus = Field(default=FileStatus.ORIGINAL)
     version: int = Field(default=1)
-    parent_file_id: Optional[int] = Field(default=None, foreign_key="attachment.id")
+    parent_file_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("attachment.id", ondelete="SET NULL")))
     
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
