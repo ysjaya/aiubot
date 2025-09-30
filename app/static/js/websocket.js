@@ -6,17 +6,17 @@ export function setupWebSocket() {
     const message = dom.userInput.value.trim();
     
     if (!message) {
-        showToast("Please type a message first.", "error");
+        showToast("Type a message first", "error");
         return;
     }
     
     if (!state.currentProjectId) {
-        showToast("Please select a project first.", "error");
+        showToast("Select a project first", "error");
         return;
     }
     
     if (!state.currentConvId) {
-        showToast("Please select or create a conversation first.", "error");
+        showToast("Select or create a conversation first", "error");
         return;
     }
 
@@ -39,8 +39,6 @@ export function setupWebSocket() {
     let fullResponse = '';
 
     state.ws.onopen = () => {
-        console.log('WebSocket connected');
-        
         appendMessage('user', message);
         dom.chatWindow.scrollTop = dom.chatWindow.scrollHeight;
         
@@ -91,9 +89,9 @@ export function setupWebSocket() {
     
     state.ws.onerror = () => {
         setLoading(false, 'Error');
-        showToast('WebSocket connection failed.', 'error');
+        showToast('WebSocket connection failed', 'error');
         if (lastAiMessageElement) {
-            lastAiMessageElement.innerHTML = "<p><strong>Error:</strong> Could not connect to the AI service.</p>";
+            lastAiMessageElement.innerHTML = "<p><strong>Error:</strong> Could not connect to AI service</p>";
         }
     };
-}
+        }
