@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { dom } from './dom.js';
 import { setLoading, showToast, appendMessage, processCodeBlocks, autoResizeTextarea } from './ui.js';
+import { actions } from './actions.js';
 
 export function setupWebSocket() {
     const message = dom.userInput.value.trim();
@@ -59,14 +60,16 @@ export function setupWebSocket() {
         try {
             const data = JSON.parse(event.data);
             if (data.status === 'update') {
-                dom.aiStatusText.textContent = data.message;
+                setLoading(true, data.message);
             } else if (data.status === 'done') {
                 setLoading(false);
                 processCodeBlocks(lastAiMessageElement);
                 state.ws.close();
+                // Reload attachments to show updates
+                actions.loadAttachments();
             } else if (data.status === 'error') {
                 setLoading(false, 'Error');
-                lastAiMessageElement.innerHTML = `<p style="color:var(--error-color);"><strong>Error:</strong> ${data.message}</p>`;
+                lastAiMessageElement.innerHTML = `<p style="color:var(--error);"><strong>Error:</strong> ${data.message}</p>`;
                 state.ws.close();
             }
         } catch (e) {
