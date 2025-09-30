@@ -22,11 +22,13 @@ Preferred communication style: Simple, everyday language.
   - Updated both streaming and non-streaming API calls
   - Model configured for 4096 max tokens with 0.7 temperature
 
-- **Deployment Configuration**: 
-  - Autoscale deployment configured with proper build and run commands
-  - Build step: Installs dependencies (pip + npm) and builds React frontend
-  - Run step: Uses start_production.sh with dynamic PORT environment variable
-  - Production server binds to 0.0.0.0 with PORT from environment (default: 5000)
+- **Deployment Configuration Fix (Port 8080)**: 
+  - Fixed UI inconsistency between Replit and Kinsta deployments
+  - **Root cause**: frontend/dist not built in Kinsta (missing build step in Dockerfile)
+  - **Solution**: Updated Dockerfile to build frontend during Docker build stage
+  - Production server now uses port 8080 as default (configurable via PORT env)
+  - Server binds to 0.0.0.0:8080 for both development and production
+  - Dockerfile installs Node.js 20, builds React frontend, and copies dist to production image
 
 - **Development Workflow**:
   - "Dev Server" workflow configured and running successfully

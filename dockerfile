@@ -7,11 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install build dependencies
+# Install build dependencies including Node.js
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
-    libpq-dev && \
+    libpq-dev \
+    curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -19,6 +22,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --user --no-warn-script-location -r requirements.txt
+
+# Build frontend
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm install
+
+COPY frontend ./frontend
+RUN cd frontend && npm run build
 
 # Production stage
 FROM python:3.11.9-slim-bullseye
@@ -43,6 +53,9 @@ WORKDIR /app
 
 # Copy Python dependencies from builder
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Copy built frontend from builder
+COPY --from=builder --chown=appuser:appuser /app/frontend/dist /app/frontend/dist
 
 # Copy application code
 COPY --chown=appuser:appuser . .
