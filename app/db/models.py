@@ -13,7 +13,7 @@ class Project(SQLModel, table=True):
     """Project with isolated database"""
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    database_name: str = Field(unique=True, index=True)  # Isolated DB per project
+    # database_name: str = Field(unique=True, index=True)  # <-- HAPUS BARIS INI
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
@@ -49,11 +49,9 @@ class Chat(SQLModel, table=True):
     ai_response: str = Field(sa_column=Column(Text))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Track which files were in context
-    context_file_ids: Optional[str] = Field(default=None)  # JSON array of file IDs
-    files_modified: Optional[str] = Field(default=None)  # JSON array of modified file IDs
+    context_file_ids: Optional[str] = Field(default=None)
+    files_modified: Optional[str] = Field(default=None)
     
-    # Relationships
     conversation: Optional[Conversation] = Relationship(back_populates="chats")
 
 class Attachment(SQLModel, table=True):
@@ -61,14 +59,12 @@ class Attachment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     conversation_id: int = Field(sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE")))
     
-    # File info
     filename: str = Field(index=True)
-    original_filename: str  # Original name when uploaded
+    original_filename: str
     content: str = Field(sa_column=Column(Text))
     mime_type: str = Field(default="text/plain")
     size_bytes: int
     
-    # Versioning (Claude-style)
     status: FileStatus = Field(
         default=FileStatus.ORIGINAL,
         sa_column=Column(SQLEnum(FileStatus), nullable=False)
@@ -79,20 +75,16 @@ class Attachment(SQLModel, table=True):
         sa_column=Column(Integer, ForeignKey("attachment.id", ondelete="SET NULL"))
     )
     
-    # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     modification_summary: Optional[str] = Field(default=None, sa_column=Column(Text))
     
-    # Import source tracking
-    import_source: Optional[str] = Field(default=None)  # "github", "upload", "manual"
-    import_metadata: Optional[str] = Field(default=None)  # JSON metadata
+    import_source: Optional[str] = Field(default=None)
+    import_metadata: Optional[str] = Field(default=None)
     
-    # Relationships
     conversation: Optional[Conversation] = Relationship(back_populates="attachments")
     
     def get_display_status(self) -> str:
-        """Get human-readable status badge"""
         status_map = {
             FileStatus.ORIGINAL: "📄 Original",
             FileStatus.MODIFIED: "✏️ Modified",
@@ -101,7 +93,6 @@ class Attachment(SQLModel, table=True):
         return status_map.get(self.status, "📄")
     
     def get_short_summary(self) -> str:
-        """Get short modification summary"""
         if not self.modification_summary:
             return ""
         return self.modification_summary[:100] + ("..." if len(self.modification_summary) > 100 else "")
