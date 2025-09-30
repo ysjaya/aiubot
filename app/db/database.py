@@ -7,6 +7,9 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
+# --- PERBAIKAN DITAMBAHKAN DI SINI ---
+connect_args = {"client_encoding": "utf8"}
+
 # Main engine for metadata storage with connection pooling
 engine = create_engine(
     settings.DATABASE_URL,
@@ -14,7 +17,8 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
-    pool_recycle=3600
+    pool_recycle=3600,
+    connect_args=connect_args  # <-- Tambahan
 )
 
 def get_session():
@@ -45,7 +49,8 @@ def create_project_database(project_name: str) -> str:
         project_engine = create_engine(
             settings.DATABASE_URL.rsplit('/', 1)[0] + f'/{db_name}',
             echo=False,
-            pool_pre_ping=True
+            pool_pre_ping=True,
+            connect_args=connect_args # <-- Tambahan juga di sini untuk engine proyek
         )
         SQLModel.metadata.create_all(project_engine)
         project_engine.dispose()
@@ -59,15 +64,12 @@ def create_project_database(project_name: str) -> str:
 def delete_project_database(database_name: str):
     """Delete project database and clear cache"""
     try:
-        # CRITICAL FIX: Clear cache BEFORE deleting database
         logger.info(f"Clearing cache for database: {database_name}")
         get_project_engine.cache_clear()
         
-        # Terminate all connections first
         with engine.connect() as conn:
             conn.execution_options(isolation_level="AUTOCOMMIT")
             
-            # Terminate connections
             conn.execute(text(f"""
                 SELECT pg_terminate_backend(pg_stat_activity.pid)
                 FROM pg_stat_activity
@@ -75,7 +77,6 @@ def delete_project_database(database_name: str):
                 AND pid <> pg_backend_pid()
             """))
             
-            # Drop database
             conn.execute(text(f'DROP DATABASE IF EXISTS "{database_name}"'))
         
         logger.info(f"Deleted project database: {database_name}")
@@ -89,7 +90,6 @@ def get_project_engine(database_name: str):
     """Get cached engine for specific project database"""
     project_url = settings.DATABASE_URL.rsplit('/', 1)[0] + f'/{database_name}'
     
-    # FIX: Add error handling for non-existent databases
     try:
         eng = create_engine(
             project_url,
@@ -97,10 +97,10 @@ def get_project_engine(database_name: str):
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
-            pool_recycle=3600
+            pool_recycle=3600,
+            connect_args=connect_args # <-- Tambahan
         )
         
-        # Test connection
         with eng.connect() as conn:
             conn.execute(text("SELECT 1"))
         
