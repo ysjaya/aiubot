@@ -6,32 +6,37 @@ export const setLoading = (loading, message = 'Ready') => {
     dom.spinner.classList.toggle('hidden', !loading);
     dom.userInput.disabled = loading;
     dom.sendBtn.disabled = loading;
-    dom.aiStatusText.textContent = loading ? "AI is thinking..." : message;
+    dom.aiStatusText.textContent = message;
 };
 
 export const showToast = (message, type = 'success') => {
     dom.toast.textContent = message;
-    dom.toast.className = '';
-    dom.toast.classList.add(type, 'show');
+    dom.toast.className = type;
+    dom.toast.classList.add('show');
     setTimeout(() => dom.toast.classList.remove('show'), 3000);
 };
 
 export const autoResizeTextarea = () => {
     dom.userInput.style.height = 'auto';
-    dom.userInput.style.height = `${dom.userInput.scrollHeight}px`;
+    dom.userInput.style.height = `${Math.min(dom.userInput.scrollHeight, 200)}px`;
 };
 
 export const renderProjects = () => {
     dom.projectList.innerHTML = '';
     if (state.projects.length === 0) {
-        dom.projectList.innerHTML = '<small>No projects yet. Create one!</small>';
+        dom.projectList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No projects yet</div>';
     } else {
         state.projects.forEach(p => {
-            const item = `<div class="list-item-container">
-                    <div class="list-item ${p.id === state.currentProjectId ? 'active' : ''}" data-project-id="${p.id}">${p.name}</div>
-                    <button class="icon-btn delete-btn" data-project-id="${p.id}" data-tooltip="Delete Project"><i class="fas fa-trash-alt"></i></button>
-                </div>`;
-            dom.projectList.insertAdjacentHTML('beforeend', item);
+            const div = document.createElement('div');
+            div.className = `list-item ${p.id === state.currentProjectId ? 'active' : ''}`;
+            div.dataset.projectId = p.id;
+            div.innerHTML = `
+                <span class="list-item-text">${p.name}</span>
+                <button class="btn-icon delete-btn" data-project-id="${p.id}">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+            dom.projectList.appendChild(div);
         });
     }
 };
@@ -39,17 +44,23 @@ export const renderProjects = () => {
 export const renderConversations = () => {
     dom.convList.innerHTML = '';
     dom.newConvBtn.disabled = !state.currentProjectId;
+    
     if (!state.currentProjectId) {
-        dom.convList.innerHTML = '<small>Select a project first.</small>';
+        dom.convList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">Select a project first</div>';
     } else if (state.conversations.length === 0) {
-        dom.convList.innerHTML = '<small>No conversations yet.</small>';
+        dom.convList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No conversations yet</div>';
     } else {
         state.conversations.forEach(c => {
-            const item = `<div class="list-item-container">
-                    <div class="list-item ${c.id === state.currentConvId ? 'active' : ''}" data-conv-id="${c.id}">${c.title}</div>
-                    <button class="icon-btn delete-btn" data-conv-id="${c.id}" data-tooltip="Delete Conversation"><i class="fas fa-trash-alt"></i></button>
-                </div>`;
-            dom.convList.insertAdjacentHTML('beforeend', item);
+            const div = document.createElement('div');
+            div.className = `list-item ${c.id === state.currentConvId ? 'active' : ''}`;
+            div.dataset.convId = c.id;
+            div.innerHTML = `
+                <span class="list-item-text">${c.title}</span>
+                <button class="btn-icon delete-btn" data-conv-id="${c.id}">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+            dom.convList.appendChild(div);
         });
     }
 };
@@ -57,11 +68,13 @@ export const renderConversations = () => {
 export const renderFiles = (files) => {
     dom.fileList.innerHTML = '';
     if (files.length === 0) {
-        dom.fileList.innerHTML = '<small>No files in this project yet.</small>';
+        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No files yet</div>';
     } else {
         files.forEach(f => {
-            const item = `<div class="list-item-container"><div class="list-item" title="${f.path}">${f.path}</div></div>`;
-            dom.fileList.insertAdjacentHTML('beforeend', item);
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML = `<span class="list-item-text" title="${f.path}">${f.path}</span>`;
+            dom.fileList.appendChild(div);
         });
     }
 };
@@ -71,6 +84,7 @@ export const processCodeBlocks = (element) => {
         if (block.dataset.highlighted) return;
         hljs.highlightElement(block);
         block.dataset.highlighted = 'true';
+        
         const pre = block.parentElement;
         if (pre.parentElement.classList.contains('code-block-wrapper')) return;
 
@@ -87,7 +101,7 @@ export const processCodeBlocks = (element) => {
         copyBtn.onclick = () => {
             navigator.clipboard.writeText(block.textContent).then(() => {
                 copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+                setTimeout(() => copyBtn.textContent = 'Copy', 2000);
             });
         };
         toolbar.appendChild(copyBtn);
