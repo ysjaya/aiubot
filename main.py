@@ -89,6 +89,14 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ GitHub integration not available: {e}")
 
+# Import Draft routes
+try:
+    from app.api import draft_routes
+    app.include_router(draft_routes.router, prefix="/api", tags=["Drafts"])
+    logger.info("✅ Draft management enabled")
+except ImportError as e:
+    logger.warning(f"⚠️ Draft management not available: {e}")
+
 @app.get("/")
 async def root(request: Request):
     """Root endpoint - serve frontend or return info"""

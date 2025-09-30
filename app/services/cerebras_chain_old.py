@@ -1,4 +1,4 @@
-# app/services/cerebras_chain_draft.py
+# app/services/cerebras_chain.py
 import os
 import json
 import asyncio
@@ -13,7 +13,6 @@ from app.db import models
 from app.db.database import get_session
 from app.core.config import settings
 from app.services import web_tools
-from app.services.code_validator import CodeCompletenessValidator, validate_and_retry
 
 import logging
 logger = logging.getLogger(__name__)
@@ -58,24 +57,7 @@ When modifying code:
 - Add comments for complex logic
 - Test for edge cases
 
-CRITICAL RULES FOR CODE GENERATION - READ CAREFULLY:
-==================================================
-✅ RULE 1: ALWAYS write 100% COMPLETE code - NEVER truncate
-✅ RULE 2: Include ALL imports, ALL functions, ALL classes - ZERO omissions
-✅ RULE 3: Write the ENTIRE file from first line to last line
-✅ RULE 4: Never use placeholders like "... rest of code" or "... kode lainnya"
-✅ RULE 5: If code is long, write it completely anyway - no shortcuts allowed
-✅ RULE 6: Every function MUST have complete implementation - no stubs
-✅ RULE 7: Every class MUST have all methods fully written - no TODO comments
-✅ RULE 8: NEVER write "# ... (continue)" or similar truncation markers
-✅ RULE 9: NEVER assume user will fill in missing parts
-✅ RULE 10: NEVER truncate or summarize code sections
-==================================================
-
-USER EXPECTS: 100% COMPLETE, READY-TO-USE CODE FOR IMMEDIATE DOWNLOAD.
-
-ABSOLUTELY NO EXCEPTIONS TO THESE RULES. IF YOU TRUNCATE CODE, IT WILL BE REJECTED.
-"""
+CRITICAL: Always reference files with their current version status (📄 Original, ✏️ Modified, ✨ Latest)"""
 
 PROMPT_ANALYZE_PROJECT = """Analyze this project structure and provide insights:
 
@@ -113,9 +95,6 @@ Instructions:
 - If multiple files need changes, address them systematically
 - Use Indonesian language for explanations
 
-CRITICAL: If you provide code, it MUST be 100% COMPLETE from start to finish.
-NO truncation, NO "...", NO shortcuts. User needs DOWNLOADABLE, WORKING CODE.
-
 Respond in well-formatted Markdown."""
 
 PROMPT_INTELLIGENT_UPDATE = """You are updating a file based on user request and AI suggestions.
@@ -138,24 +117,15 @@ AI RESPONSE/SUGGESTIONS:
 
 Your task:
 1. Analyze what changes are needed
-2. Generate the COMPLETE updated file content (100% LENGKAP, NO TRUNCATION)
+2. Generate the COMPLETE updated file content
 3. Provide a clear summary of changes
-
-CRITICAL REQUIREMENTS:
-- The "content" field MUST contain the ENTIRE file from start to finish
-- Include ALL imports, ALL functions, ALL classes
-- Do NOT use "...", "rest of code", or any truncation markers
-- Write the COMPLETE file as if user will download it immediately
-- Every line of code must be present - no omissions
 
 Respond with ONLY valid JSON:
 {{
-    "content": "COMPLETE FULL FILE CONTENT HERE - EVERY SINGLE LINE",
+    "content": "COMPLETE updated file content here",
     "summary": "Brief description of changes",
     "changes": ["change 1", "change 2", "change 3"]
-}}
-
-REMEMBER: The content field must have the FULL FILE, not a snippet."""
+}}"""
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -169,7 +139,7 @@ async def call_cerebras(messages: List[Dict]) -> str:
             cerebras_client.chat.completions.create,
             messages=messages,
             model="qwen-3-235b-a22b-instruct-2507",
-            max_tokens=16384,
+            max_tokens=4096,
             temperature=0.7
         )
         return response.choices[0].message.content
@@ -202,7 +172,7 @@ def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 1000
     current_messages = messages.copy()
     total_generated = 0
     continue_count = 0
-    max_continues = 20
+    max_continues = 20  # Safety limit
     
     while continue_count < max_continues and total_generated < max_total_tokens:
         try:
@@ -227,10 +197,12 @@ def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 1000
                 if chunk.choices[0].finish_reason:
                     finish_reason = chunk.choices[0].finish_reason
             
+            # If finished normally or reached token limit
             if finish_reason == "stop" or finish_reason is None:
                 logger.info(f"[UNLIMITED] Stream completed normally after {continue_count} continues")
                 break
             elif finish_reason == "length":
+                # Continue generating
                 logger.info(f"[UNLIMITED] Hit token limit, continuing... ({continue_count + 1}/{max_continues})")
                 current_messages.append({
                     "role": "assistant",
@@ -238,7 +210,7 @@ def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 1000
                 })
                 current_messages.append({
                     "role": "user", 
-                    "content": "Lanjutkan respons Anda dari posisi terakhir. INGAT: Tulis kode LENGKAP 100%, jangan gunakan '...' atau potong kode."
+                    "content": "Lanjutkan respons Anda dari posisi terakhir."
                 })
                 continue_count += 1
             else:
@@ -259,11 +231,10 @@ def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 1000
 async def get_conversation_context(conv_id: int):
     """Get conversation context including files and chat history"""
     with next(get_session()) as session:
-        # Get attachments with LATEST status
+        # Get attachments
         attachments = session.exec(
             select(models.Attachment)
             .where(models.Attachment.conversation_id == conv_id)
-            .where(models.Attachment.status == models.FileStatus.LATEST)
             .order_by(models.Attachment.updated_at.desc())
         ).all()
         
@@ -273,7 +244,7 @@ async def get_conversation_context(conv_id: int):
             for att in attachments:
                 status = att.get_display_status()
                 file_context += f"\n## {status} {att.filename} (v{att.version})\n"
-                file_context += f"```\n{att.content[:3000]}\n```\n"
+                file_context += f"```\n{att.content[:2000]}\n```\n"
         
         # Get recent chat history
         chats = session.exec(
@@ -327,174 +298,10 @@ def detect_code_blocks_with_filenames(response: str) -> List[Dict]:
         # Look for file mentions before code blocks
         elif not in_code_block:
             match = re.search(r'\b([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)\b', line.lower())
-            if match and any(keyword in line.lower() for keyword in ['update', 'modify', 'change', 'fix', 'in ', 'file']):
+            if match and any(keyword in line.lower() for keyword in ['update', 'modify', 'change', 'fix', 'in ']):
                 current_file = match.group(1)
     
     return detected
-
-async def save_to_draft_with_validation(
-    conversation_id: int,
-    project_id: int,
-    filename: str,
-    content: str,
-    attachment_id: Optional[int],
-    change_summary: str,
-    change_details: List[str],
-    session: Session
-) -> Optional[models.DraftVersion]:
-    """
-    Save AI-generated code to DraftVersion with completeness validation
-    
-    Returns DraftVersion if successful, None if validation fails
-    """
-    try:
-        logger.info(f"[DRAFT] Saving draft for {filename}...")
-        
-        # Validate completeness
-        content_clean, validation_result = validate_and_retry(content, filename)
-        
-        if not validation_result['is_complete']:
-            logger.error(f"[DRAFT] ❌ Code validation FAILED for {filename}")
-            logger.error(f"[DRAFT] Issues: {validation_result['issues']}")
-            # Save draft but mark as incomplete
-            is_complete = False
-            completeness_score = validation_result['score']
-        else:
-            logger.info(f"[DRAFT] ✅ Code validation PASSED for {filename} (score: {validation_result['score']:.2f})")
-            is_complete = True
-            completeness_score = validation_result['score']
-        
-        # Compute hash and length
-        content_hash = models.DraftVersion.compute_hash(models.DraftVersion(
-            conversation_id=conversation_id,
-            project_id=project_id,
-            filename=filename,
-            content=content,
-            content_hash="",
-            content_length=len(content)
-        ))
-        
-        # Get next version number
-        existing_drafts = session.exec(
-            select(models.DraftVersion)
-            .where(models.DraftVersion.conversation_id == conversation_id)
-            .where(models.DraftVersion.filename == filename)
-        ).all()
-        
-        next_version = max([d.version_number for d in existing_drafts], default=0) + 1
-        
-        # Create draft
-        draft = models.DraftVersion(
-            conversation_id=conversation_id,
-            project_id=project_id,
-            filename=filename,
-            original_filename=filename,
-            attachment_id=attachment_id,
-            content=content,
-            content_hash=content_hash,
-            content_length=len(content),
-            version_number=next_version,
-            status=models.DraftStatus.PENDING if not is_complete else models.DraftStatus.APPROVED,
-            is_complete=is_complete,
-            has_syntax_errors=False,
-            completeness_score=completeness_score,
-            change_summary=change_summary,
-            change_details=json.dumps(change_details),
-            ai_model="cerebras",
-            generation_metadata=json.dumps({
-                "validation": validation_result,
-                "created_at": datetime.utcnow().isoformat()
-            })
-        )
-        
-        session.add(draft)
-        session.commit()
-        session.refresh(draft)
-        
-        logger.info(f"[DRAFT] ✅ Saved draft v{next_version} for {filename} (complete={is_complete}, score={completeness_score:.2f})")
-        
-        return draft
-        
-    except Exception as e:
-        logger.error(f"[DRAFT] ❌ Error saving draft for {filename}: {e}", exc_info=True)
-        return None
-
-async def promote_draft_to_attachment(
-    draft: models.DraftVersion,
-    session: Session
-) -> Optional[models.Attachment]:
-    """
-    Promote an approved draft to Attachment with LATEST status
-    Auto-promote if draft is complete and approved
-    """
-    try:
-        if not draft.is_complete:
-            logger.warning(f"[PROMOTE] ⚠️ Cannot promote incomplete draft {draft.filename}")
-            return None
-        
-        logger.info(f"[PROMOTE] Promoting draft {draft.filename} v{draft.version_number} to LATEST...")
-        
-        # Mark old LATEST as MODIFIED
-        old_latest = session.exec(
-            select(models.Attachment)
-            .where(models.Attachment.conversation_id == draft.conversation_id)
-            .where(models.Attachment.filename == draft.filename)
-            .where(models.Attachment.status == models.FileStatus.LATEST)
-        ).first()
-        
-        if old_latest:
-            old_latest.status = models.FileStatus.MODIFIED
-            session.add(old_latest)
-        
-        # Determine version number for new Attachment
-        all_attachments = session.exec(
-            select(models.Attachment)
-            .where(models.Attachment.conversation_id == draft.conversation_id)
-            .where(models.Attachment.filename == draft.filename)
-        ).all()
-        
-        next_att_version = max([a.version for a in all_attachments], default=0) + 1
-        
-        # Create new LATEST Attachment
-        new_att = models.Attachment(
-            conversation_id=draft.conversation_id,
-            project_id=draft.project_id,
-            filename=draft.filename,
-            original_filename=draft.original_filename,
-            file_path=draft.filename,
-            content=draft.content,
-            content_hash=draft.content_hash,
-            mime_type="text/plain",
-            size_bytes=draft.content_length,
-            status=models.FileStatus.LATEST,
-            version=next_att_version,
-            parent_file_id=old_latest.id if old_latest else None,
-            modification_summary=draft.change_summary,
-            import_source="ai_draft",
-            import_metadata=json.dumps({
-                "draft_id": draft.id,
-                "draft_version": draft.version_number,
-                "promoted_at": datetime.utcnow().isoformat()
-            })
-        )
-        
-        session.add(new_att)
-        
-        # Mark draft as PROMOTED
-        draft.status = models.DraftStatus.PROMOTED
-        draft.promoted_at = datetime.utcnow()
-        session.add(draft)
-        
-        session.commit()
-        session.refresh(new_att)
-        
-        logger.info(f"[PROMOTE] ✅ {draft.filename} promoted to Attachment v{next_att_version} with LATEST status")
-        
-        return new_att
-        
-    except Exception as e:
-        logger.error(f"[PROMOTE] ❌ Error promoting draft {draft.filename}: {e}", exc_info=True)
-        return None
 
 async def intelligent_file_update(
     attachment: models.Attachment,
@@ -503,14 +310,11 @@ async def intelligent_file_update(
     project_files: str,
     session: Session
 ) -> Optional[models.Attachment]:
-    """
-    Intelligently update a file based on conversation context
-    Uses DraftVersion system with validation
-    """
+    """Intelligently update a file based on conversation context"""
     try:
         logger.info(f"[FILE UPDATE] Processing: {attachment.filename}")
         
-        # Build intelligent update prompt with COMPLETE CODE enforcement
+        # Build intelligent update prompt
         update_prompt = PROMPT_INTELLIGENT_UPDATE.format(
             filename=attachment.filename,
             version=attachment.version,
@@ -542,32 +346,62 @@ async def intelligent_file_update(
                 logger.warning(f"[FILE UPDATE] ❌ Generated content too short")
                 return None
             
-            # Save to draft with validation
-            draft = await save_to_draft_with_validation(
+            # Create new version
+            root_id = attachment.parent_file_id if attachment.parent_file_id else attachment.id
+            
+            # Get max version
+            all_versions = session.exec(
+                select(models.Attachment)
+                .where(
+                    (models.Attachment.id == root_id) | 
+                    (models.Attachment.parent_file_id == root_id)
+                )
+            ).all()
+            next_version = max([v.version for v in all_versions]) + 1 if all_versions else 2
+            
+            # Mark old LATEST as MODIFIED
+            old_latest = session.exec(
+                select(models.Attachment)
+                .where(models.Attachment.conversation_id == attachment.conversation_id)
+                .where(models.Attachment.filename == attachment.filename)
+                .where(models.Attachment.status == models.FileStatus.LATEST)
+            ).first()
+            
+            if old_latest:
+                old_latest.status = models.FileStatus.MODIFIED
+                session.add(old_latest)
+            
+            # Create new version
+            full_summary = f"✨ TERBARU: {summary}"
+            if changes:
+                full_summary += f" | Perubahan: {', '.join(changes[:3])}"
+            
+            new_att = models.Attachment(
                 conversation_id=attachment.conversation_id,
-                project_id=attachment.project_id,
                 filename=attachment.filename,
+                original_filename=attachment.original_filename,
                 content=new_content,
-                attachment_id=attachment.id,
-                change_summary=summary,
-                change_details=changes,
-                session=session
+                mime_type=attachment.mime_type,
+                size_bytes=len(new_content.encode('utf-8')),
+                status=models.FileStatus.LATEST,
+                version=next_version,
+                parent_file_id=root_id,
+                modification_summary=full_summary,
+                import_source=attachment.import_source,
+                import_metadata=json.dumps({
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_by": "ai",
+                    "changes": changes
+                })
             )
             
-            if not draft:
-                logger.error(f"[FILE UPDATE] ❌ Failed to create draft for {attachment.filename}")
-                return None
+            session.add(new_att)
+            session.commit()
+            session.refresh(new_att)
             
-            # Auto-promote if complete
-            if draft.is_complete and draft.status == models.DraftStatus.APPROVED:
-                new_att = await promote_draft_to_attachment(draft, session)
-                if new_att:
-                    logger.info(f"[FILE UPDATE] ✅ {attachment.filename} updated and promoted to v{new_att.version}")
-                    return new_att
-            else:
-                logger.warning(f"[FILE UPDATE] ⚠️ Draft created but not complete enough for auto-promotion")
-                logger.warning(f"[FILE UPDATE] Score: {draft.completeness_score:.2f}, Issues: {json.loads(draft.generation_metadata).get('validation', {}).get('issues', [])}")
-                return None
+            logger.info(f"[FILE UPDATE] ✅ {attachment.filename} updated to v{next_version}")
+            
+            return new_att
             
         except json.JSONDecodeError as e:
             logger.error(f"[FILE UPDATE] ❌ Failed to parse AI response: {e}")
@@ -580,9 +414,7 @@ async def intelligent_file_update(
 # ==================== MAIN AI CHAIN ====================
 
 async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bool = True):
-    """
-    Enhanced AI chain with intelligent file analysis, draft system, and completeness validation
-    """
+    """Enhanced AI chain with intelligent file analysis and updates"""
     user_query = messages[-1]['content']
     logger.info(f"[AI CHAIN] Starting for conv {conv_id} (unlimited={unlimited})")
     
@@ -631,9 +463,9 @@ async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bo
         
         # Generate response
         if unlimited:
-            yield json.dumps({"status": "update", "message": "🤖 Generating response (Unlimited Mode - 100% Complete Code)..."})
+            yield json.dumps({"status": "update", "message": "🤖 Generating response (Unlimited Mode)..."})
         else:
-            yield json.dumps({"status": "update", "message": "🤖 Generating response (100% Complete Code)..."})
+            yield json.dumps({"status": "update", "message": "🤖 Generating response..."})
         
         main_prompt = PROMPT_WITH_CONTEXT.format(
             CONTEXT=file_context or "No files attached yet.",
@@ -678,9 +510,9 @@ async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bo
                         })
                         break
             
-            # Apply updates using draft system
+            # Apply updates
             if files_to_update:
-                yield json.dumps({"status": "update", "message": f"✏️ Creating drafts for {len(files_to_update)} file(s)..."})
+                yield json.dumps({"status": "update", "message": f"✏️ Updating {len(files_to_update)} file(s)..."})
                 
                 updated_files = []
                 
@@ -705,13 +537,11 @@ async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bo
                     update_notification = "\n\n---\n### ✨ Files Updated:\n\n"
                     for file in updated_files:
                         update_notification += f"- **{file.filename}** (v{file.version}) - {file.modification_summary}\n"
-                    update_notification += "\n_Semua file di atas adalah LENGKAP 100% dan siap untuk di-commit._\n"
                     
                     yield update_notification
                     modified_ids = [f.id for f in updated_files]
                 else:
                     modified_ids = []
-                    yield "\n\n_⚠️ Catatan: Beberapa draft dibuat tapi tidak lengkap. Periksa draft untuk review manual._\n"
             else:
                 modified_ids = []
         else:
