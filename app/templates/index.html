@@ -223,7 +223,7 @@
         
         // Service Worker for PWA (optional)
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(() => {
+            navigator.serviceWorker.register('/static/sw.js').catch(() => {
                 // Service worker not available, ignore
             });
         }
