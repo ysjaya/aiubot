@@ -2,23 +2,18 @@ import { dom } from './dom.js';
 import { actions } from './actions.js';
 import { setupWebSocket } from './websocket.js';
 import { autoResizeTextarea, closeSidebars } from './ui.js';
-import { checkAuth } from './auth.js';
 
-// Project & Conversation
+// Event Listeners
 dom.newProjectBtn.addEventListener('click', actions.handleNewProject);
 dom.newConvBtn.addEventListener('click', actions.handleNewConversation);
-
-// Chat Form
 dom.chatForm.addEventListener('submit', (e) => { 
     e.preventDefault(); 
     setupWebSocket(); 
 });
 
-// List Clicks
 dom.projectList.addEventListener('click', actions.handleProjectClick);
 dom.convList.addEventListener('click', actions.handleConvClick);
 
-// Textarea
 dom.userInput.addEventListener('input', autoResizeTextarea);
 dom.userInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -27,17 +22,12 @@ dom.userInput.addEventListener('keydown', (e) => {
     }
 });
 
-// File Upload
 dom.uploadFileBtn.addEventListener('click', () => dom.fileUploadInput.click());
-dom.fileUploadInput.addEventListener('change', actions.handleFileUpload);
+dom.fileUploadInput.addEventListener('change', actions.handleFileAttach);
 
-// GitHub Import
-dom.importGithubBtn.addEventListener('click', actions.handleGitHubImportClick);
-
-// Modal
 dom.modalCloseBtn.addEventListener('click', () => dom.githubModal.close());
 
-// Mobile Sidebars
+// Mobile sidebars
 dom.toggleLeftSidebarBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     closeSidebars();
@@ -56,10 +46,11 @@ dom.mobileOverlay.addEventListener('click', closeSidebars);
 
 // Initialize
 const init = async () => {
-    checkAuth();
+    console.log('🚀 Initializing AI Assistant...');
     await actions.loadProjects();
     await actions.loadConversations();
-    await actions.loadFiles();
+    await actions.loadAttachments();
+    console.log('✅ Ready');
 };
 
 init();
