@@ -15,13 +15,15 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
+    unlimited: bool = True  # Default to unlimited mode
 
 # ==================== STREAMING ENDPOINT (HTTP) ====================
 
 async def stream_chat_response(
     message: str,
     project_id: int,
-    conv_id: int
+    conv_id: int,
+    unlimited: bool = True
 ) -> AsyncGenerator[str, None]:
     """Generate SSE stream for chat response"""
     
@@ -34,7 +36,8 @@ async def stream_chat_response(
         async for chunk in ai_chain_stream(
             messages,
             project_id,
-            conv_id
+            conv_id,
+            unlimited=unlimited
         ):
             if isinstance(chunk, str):
                 if chunk.strip():
@@ -67,7 +70,8 @@ async def chat(
         stream_chat_response(
             request.message,
             project_id,
-            conv_id
+            conv_id,
+            unlimited=request.unlimited
         ),
         media_type="text/event-stream",
         headers={

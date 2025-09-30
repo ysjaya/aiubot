@@ -147,8 +147,8 @@ async def call_cerebras(messages: List[Dict]) -> str:
         logger.error(f"Cerebras API error: {e}")
         raise
 
-def stream_cerebras(messages: List[Dict]):
-    """Stream Cerebras API response"""
+def stream_cerebras(messages: List[Dict], max_tokens: int = 16384):
+    """Stream Cerebras API response with configurable max_tokens"""
     if not cerebras_client:
         raise Exception("Cerebras client not initialized")
     
@@ -156,13 +156,77 @@ def stream_cerebras(messages: List[Dict]):
         return cerebras_client.chat.completions.create(
             messages=messages,
             model="qwen-3-235b-a22b-instruct-2507",
-            max_tokens=4096,
+            max_tokens=max_tokens,
             temperature=0.7,
             stream=True
         )
     except Exception as e:
         logger.error(f"Cerebras streaming error: {e}")
         raise
+
+def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 100000):
+    """Stream Cerebras API with auto-continue for unlimited output"""
+    if not cerebras_client:
+        raise Exception("Cerebras client not initialized")
+    
+    current_messages = messages.copy()
+    total_generated = 0
+    continue_count = 0
+    max_continues = 20  # Safety limit
+    
+    while continue_count < max_continues and total_generated < max_total_tokens:
+        try:
+            stream = cerebras_client.chat.completions.create(
+                messages=current_messages,
+                model="qwen-3-235b-a22b-instruct-2507",
+                max_tokens=16384,
+                temperature=0.7,
+                stream=True
+            )
+            
+            accumulated_response = ""
+            finish_reason = None
+            
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    accumulated_response += content
+                    total_generated += len(content)
+                    yield content
+                
+                if chunk.choices[0].finish_reason:
+                    finish_reason = chunk.choices[0].finish_reason
+            
+            # If finished normally or reached token limit
+            if finish_reason == "stop" or finish_reason is None:
+                logger.info(f"[UNLIMITED] Stream completed normally after {continue_count} continues")
+                break
+            elif finish_reason == "length":
+                # Continue generating
+                logger.info(f"[UNLIMITED] Hit token limit, continuing... ({continue_count + 1}/{max_continues})")
+                current_messages.append({
+                    "role": "assistant",
+                    "content": accumulated_response
+                })
+                current_messages.append({
+                    "role": "user", 
+                    "content": "Lanjutkan respons Anda dari posisi terakhir."
+                })
+                continue_count += 1
+            else:
+                logger.info(f"[UNLIMITED] Stopped with reason: {finish_reason}")
+                break
+                
+        except Exception as e:
+            logger.error(f"[UNLIMITED] Error during streaming: {e}")
+            raise
+    
+    if continue_count >= max_continues:
+        logger.warning(f"[UNLIMITED] Reached max continues limit ({max_continues})")
+        yield "\n\n_[Output limit reached - maximum continuation attempts exceeded]_"
+    elif total_generated >= max_total_tokens:
+        logger.warning(f"[UNLIMITED] Reached total token limit ({max_total_tokens})")
+        yield "\n\n_[Output limit reached - maximum total tokens generated]_"
 
 async def get_conversation_context(conv_id: int):
     """Get conversation context including files and chat history"""
@@ -349,10 +413,10 @@ async def intelligent_file_update(
 
 # ==================== MAIN AI CHAIN ====================
 
-async def ai_chain_stream(messages, project_id: int, conv_id: int):
+async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bool = True):
     """Enhanced AI chain with intelligent file analysis and updates"""
     user_query = messages[-1]['content']
-    logger.info(f"[AI CHAIN] Starting for conv {conv_id}")
+    logger.info(f"[AI CHAIN] Starting for conv {conv_id} (unlimited={unlimited})")
     
     try:
         if not cerebras_client:
@@ -398,7 +462,10 @@ async def ai_chain_stream(messages, project_id: int, conv_id: int):
                 web_snippets = "Web search unavailable."
         
         # Generate response
-        yield json.dumps({"status": "update", "message": "🤖 Generating response..."})
+        if unlimited:
+            yield json.dumps({"status": "update", "message": "🤖 Generating response (Unlimited Mode)..."})
+        else:
+            yield json.dumps({"status": "update", "message": "🤖 Generating response..."})
         
         main_prompt = PROMPT_WITH_CONTEXT.format(
             CONTEXT=file_context or "No files attached yet.",
@@ -410,15 +477,21 @@ async def ai_chain_stream(messages, project_id: int, conv_id: int):
         system_msg = {"role": "system", "content": PROMPT_SYSTEM}
         user_msg = {"role": "user", "content": main_prompt}
         
-        # Stream response
-        stream = stream_cerebras([system_msg, user_msg])
-        
+        # Stream response with unlimited or normal mode
         full_response = ""
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
+        if unlimited:
+            # Use unlimited streaming with auto-continue
+            for content in stream_cerebras_unlimited([system_msg, user_msg], max_total_tokens=100000):
                 full_response += content
                 yield content
+        else:
+            # Use normal streaming
+            stream = stream_cerebras([system_msg, user_msg], max_tokens=16384)
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield content
         
         # File modification detection
         if attachments and full_response:

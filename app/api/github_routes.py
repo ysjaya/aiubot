@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.db.database import get_session
 from app.db import models
-from app.services import github_import
+from app.services import github_import, github_commit
 from app.api.routers import get_github_token
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,14 @@ class GitHubImportRequest(BaseModel):
 
 class GitHubRepoListRequest(BaseModel):
     pass
+
+class GitHubCommitRequest(BaseModel):
+    repo_fullname: str
+    conversation_id: int
+    project_id: int
+    branch: str = "main"
+    commit_message: Optional[str] = None
+    base_path: Optional[str] = ""
 
 # ==================== GITHUB ROUTES ====================
 
@@ -243,4 +251,43 @@ async def import_all_from_repo(
         
     except Exception as e:
         logger.error(f"Failed to import all files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/commit-all")
+async def commit_all_conversation_files(
+    request: GitHubCommitRequest,
+    github_token: str = Depends(get_github_token),
+    session: Session = Depends(get_session)
+):
+    """Commit all LATEST files from a conversation to GitHub repository"""
+    
+    # Verify project
+    project = session.get(models.Project, request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Verify conversation
+    conv = session.get(models.Conversation, request.conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    try:
+        result = github_commit.commit_all_files(
+            github_token=github_token,
+            repo_fullname=request.repo_fullname,
+            conversation_id=request.conversation_id,
+            session=session,
+            branch=request.branch,
+            commit_message=request.commit_message,
+            base_path=request.base_path
+        )
+        
+        if result["success"]:
+            logger.info(f"✅ Committed {result['files_count']} files to {request.repo_fullname}")
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Commit failed"))
+            
+    except Exception as e:
+        logger.error(f"Failed to commit files: {e}")
         raise HTTPException(status_code=500, detail=str(e))

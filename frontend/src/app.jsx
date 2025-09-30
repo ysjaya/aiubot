@@ -103,6 +103,8 @@ function App() {
   const [showNewConv, setShowNewConv] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showCommitModal, setShowCommitModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newConvTitle, setNewConvTitle] = useState('');
   const [codeCanvas, setCodeCanvas] = useState(null);
@@ -116,6 +118,13 @@ function App() {
   const [githubToken, setGithubToken] = useState(localStorage.getItem('github_token'));
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  
+  // Commit state
+  const [commitRepoName, setCommitRepoName] = useState('');
+  const [commitBranch, setCommitBranch] = useState('main');
+  const [commitMessage, setCommitMessage] = useState('');
+  const [commitBasePath, setCommitBasePath] = useState('');
+  const [committing, setCommitting] = useState(false);
   
   // Refs
   const chatEndRef = useRef(null);
@@ -582,6 +591,91 @@ function App() {
     setImportProgress(null);
   };
 
+  // ==================== COMMIT FUNCTIONS ====================
+
+  const openCommitModal = () => {
+    if (!selectedConv) {
+      alert('Pilih percakapan terlebih dahulu');
+      return;
+    }
+    
+    if (attachments.length === 0) {
+      alert('Tidak ada file untuk di-commit');
+      return;
+    }
+    
+    if (!githubToken) {
+      alert('Silakan login GitHub terlebih dahulu');
+      handleGitHubAuth();
+      return;
+    }
+    
+    setShowCommitModal(true);
+    setCommitMessage(`Update ${attachments.length} file(s) from AI Code Assistant`);
+    
+    // Auto-load repos if needed
+    if (githubRepos.length === 0) {
+      loadGitHubRepos();
+    }
+  };
+
+  const closeCommitModal = () => {
+    setShowCommitModal(false);
+    setCommitRepoName('');
+    setCommitBranch('main');
+    setCommitMessage('');
+    setCommitBasePath('');
+  };
+
+  const commitAllFiles = async () => {
+    if (!commitRepoName) {
+      alert('Pilih repository untuk commit');
+      return;
+    }
+
+    setCommitting(true);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/github/commit-all`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${githubToken}`
+        },
+        body: JSON.stringify({
+          repo_fullname: commitRepoName,
+          conversation_id: selectedConv.id,
+          project_id: selectedProject.id,
+          branch: commitBranch || 'main',
+          commit_message: commitMessage,
+          base_path: commitBasePath
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Commit failed');
+      }
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert(`✅ Berhasil commit ${data.files_count} file ke ${commitRepoName}!\n\nCommit: ${data.commit_sha.substring(0, 7)}\nBranch: ${data.branch}\n\nURL: ${data.commit_url}`);
+        
+        // Open commit URL
+        if (confirm('Buka commit di GitHub?')) {
+          window.open(data.commit_url, '_blank');
+        }
+        
+        closeCommitModal();
+      }
+    } catch (err) {
+      console.error('Failed to commit files:', err);
+      alert('Gagal commit file: ' + err.message);
+    } finally {
+      setCommitting(false);
+    }
+  };
+
   // ==================== RENDER HELPERS ====================
 
   const renderFileStatus = (att) => {
@@ -778,15 +872,6 @@ function App() {
                 <h2>{selectedConv.title}</h2>
                 <small>{selectedProject.name}</small>
               </div>
-              <div className="header-actions">
-                <button
-                  className="btn-secondary"
-                  onClick={openGitHubImportModal}
-                  disabled={!selectedConv}
-                >
-                  📦 Import GitHub
-                </button>
-              </div>
             </div>
 
             {/* FILE MANAGER */}
@@ -894,6 +979,16 @@ function App() {
 
             {/* CHAT INPUT */}
             <div className="chat-input-container">
+              <div className="chat-input-actions">
+                <button
+                  className="btn-commit"
+                  onClick={openCommitModal}
+                  disabled={loading || attachments.length === 0}
+                  title="Commit all files to GitHub"
+                >
+                  🚀 Commit to GitHub
+                </button>
+              </div>
               <div className="chat-input">
                 <input
                   type="file"
@@ -902,13 +997,37 @@ function App() {
                   onChange={handleFileSelect}
                   accept=".txt,.py,.js,.jsx,.ts,.tsx,.json,.md,.html,.css,.java,.c,.cpp,.go,.rs"
                 />
-                <button
-                  className="btn-secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading}
-                >
-                  📎
-                </button>
+                <div className="attachment-dropdown">
+                  <button
+                    className="btn-secondary btn-attachment"
+                    onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                    disabled={loading}
+                  >
+                    📎
+                  </button>
+                  {showAttachmentMenu && (
+                    <div className="dropdown-menu">
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setShowAttachmentMenu(false);
+                          openGitHubImportModal();
+                        }}
+                      >
+                        📦 Import from GitHub
+                      </button>
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setShowAttachmentMenu(false);
+                          fileInputRef.current?.click();
+                        }}
+                      >
+                        💻 Upload from Local
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -943,6 +1062,95 @@ function App() {
           filename={codeCanvas.filename}
           onClose={() => setCodeCanvas(null)}
         />
+      )}
+
+      {/* COMMIT MODAL */}
+      {showCommitModal && (
+        <div className="modal-overlay" onClick={closeCommitModal}>
+          <div className="modal-content commit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🚀 Commit All Files to GitHub</h2>
+              <button className="btn-close" onClick={closeCommitModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Repository *</label>
+                <select
+                  value={commitRepoName}
+                  onChange={(e) => setCommitRepoName(e.target.value)}
+                  disabled={committing}
+                >
+                  <option value="">-- Pilih Repository --</option>
+                  {githubRepos.map(repo => (
+                    <option key={repo.full_name} value={repo.full_name}>
+                      {repo.full_name} {repo.private ? '🔒' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Branch</label>
+                <input
+                  type="text"
+                  value={commitBranch}
+                  onChange={(e) => setCommitBranch(e.target.value)}
+                  placeholder="main"
+                  disabled={committing}
+                />
+                <small>Branch akan dibuat otomatis jika belum ada</small>
+              </div>
+
+              <div className="form-group">
+                <label>Commit Message *</label>
+                <textarea
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="Update files from AI Code Assistant"
+                  rows={3}
+                  disabled={committing}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Base Path (Optional)</label>
+                <input
+                  type="text"
+                  value={commitBasePath}
+                  onChange={(e) => setCommitBasePath(e.target.value)}
+                  placeholder="e.g., src/ or backend/"
+                  disabled={committing}
+                />
+                <small>Folder tujuan di repository (kosongkan untuk root)</small>
+              </div>
+
+              <div className="commit-summary">
+                <strong>📊 Summary:</strong>
+                <p>{attachments.filter(a => a.status === 'latest').length} files will be committed</p>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn-secondary"
+                  onClick={closeCommitModal}
+                  disabled={committing}
+                >
+                  Batal
+                </button>
+                <button
+                  className="btn-primary btn-large"
+                  onClick={commitAllFiles}
+                  disabled={committing || !commitRepoName || !commitMessage}
+                >
+                  {committing ? '⏳ Committing...' : '🚀 Commit Now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* GITHUB IMPORT MODAL */}
