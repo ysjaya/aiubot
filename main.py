@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 from contextlib import asynccontextmanager
 import logging
 
@@ -49,21 +52,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+try:
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    logger.info("✅ Static files mounted")
+except Exception as e:
+    logger.warning(f"⚠️ Could not mount static files: {e}")
+
+# Templates
+try:
+    templates = Jinja2Templates(directory="app/templates")
+    logger.info("✅ Templates loaded")
+except Exception as e:
+    logger.warning(f"⚠️ Could not load templates: {e}")
+    templates = None
+
 # Include routers
 app.include_router(routers.router, prefix="/api", tags=["API"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 
 # Import GitHub routes if needed
 try:
-    from app.api import github_routes
-    app.include_router(github_routes.router, prefix="/api", tags=["GitHub"])
+    from app.api import github_routes, auth
+    app.include_router(github_routes.router, prefix="/api/github", tags=["GitHub"])
+    app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
     logger.info("✅ GitHub integration enabled")
-except ImportError:
-    logger.warning("⚠️ GitHub integration not available")
+except ImportError as e:
+    logger.warning(f"⚠️ GitHub integration not available: {e}")
 
 @app.get("/")
-async def root():
-    """Root endpoint"""
+async def root(request: Request):
+    """Root endpoint - serve frontend or return info"""
+    if templates:
+        try:
+            return templates.TemplateResponse("index.html", {"request": request})
+        except Exception as e:
+            logger.error(f"Template error: {e}")
+    
     return {
         "message": "AI Code Assistant API",
         "version": "2.0.0",
@@ -82,7 +107,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": "2.0.0"}
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -101,4 +126,4 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
         log_level="info"
-)
+    )
