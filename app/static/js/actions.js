@@ -1,282 +1,172 @@
-import { state } from './state.js';
-import { api } from './api.js';
-import { showToast, renderProjects, renderConversations, renderAttachments, renderChats, closeSidebars } from './ui.js';
 import { dom } from './dom.js';
+import { state } from './state.js';
 
-export const actions = {
-    loadProjects: async () => {
-        try {
-            state.projects = await api.get('/projects');
-            renderProjects();
-        } catch (err) {
-            showToast('Failed to load projects', 'error');
-        }
-    },
+export const setLoading = (loading, message = 'Ready') => {
+    state.isLoading = loading;
+    dom.spinner.classList.toggle('hidden', !loading);
+    dom.userInput.disabled = loading;
+    dom.sendBtn.disabled = loading;
+    dom.aiStatusText.textContent = message;
+};
 
-    loadConversations: async () => {
-        if (!state.currentProjectId) {
-            state.conversations = [];
-            return renderConversations();
-        }
-        try {
-            state.conversations = await api.get(`/project/${state.currentProjectId}/conversations`);
-            renderConversations();
-        } catch (err) {
-            showToast('Failed to load conversations', 'error');
-        }
-    },
+export const showToast = (message, type = 'success') => {
+    dom.toast.textContent = message;
+    dom.toast.className = type;
+    dom.toast.classList.add('show');
+    setTimeout(() => dom.toast.classList.remove('show'), 3000);
+};
 
-    loadAttachments: async () => {
-        if (!state.currentConvId) {
-            state.attachments = [];
-            return renderAttachments([]);
-        }
-        try {
-            const attachments = await api.get(`/conversation/${state.currentConvId}/attachments`);
-            state.attachments = attachments;
-            renderAttachments(attachments);
-        } catch (err) {
-            renderAttachments([]);
-        }
-    },
+export const autoResizeTextarea = () => {
+    dom.userInput.style.height = 'auto';
+    dom.userInput.style.height = `${Math.min(dom.userInput.scrollHeight, 200)}px`;
+};
 
-    handleNewProject: async () => {
-        const name = prompt("Project name:");
-        if (!name?.trim()) return;
-        
-        try {
-            await api.post(`/project?name=${encodeURIComponent(name.trim())}`);
-            showToast('Project created');
-            await actions.loadProjects();
-        } catch (err) {
-            showToast('Failed to create project', 'error');
-        }
-    },
-
-    handleNewConversation: async () => {
-        if (!state.currentProjectId) {
-            showToast('Select a project first', 'error');
-            return;
-        }
-        
-        const title = prompt("Conversation title:", "New Chat");
-        if (!title?.trim()) return;
-        
-        try {
-            const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title.trim())}`);
-            state.currentConvId = newConv.id;
-            state.attachments = [];
-            await actions.loadConversations();
-            renderChats([]);
-            renderAttachments([]);
-        } catch (err) {
-            showToast('Failed to create conversation', 'error');
-        }
-    },
-
-    handleDeleteProject: async (projectId) => {
-        if (!confirm("Delete this project? All conversations and files will be permanently deleted!")) return;
-        
-        try {
-            await api.delete(`/project/${projectId}`);
-            if (state.currentProjectId === projectId) {
-                state.currentProjectId = null;
-                state.currentConvId = null;
-                state.conversations = [];
-                state.attachments = [];
-                dom.chatMessages.classList.add('hidden');
-                dom.welcomeMessage.classList.remove('hidden');
-                renderAttachments([]);
-            }
-            await actions.loadProjects();
-            renderConversations();
-            showToast('Project deleted');
-        } catch(err) {
-            showToast('Failed to delete project', 'error');
-        }
-    },
-
-    handleDeleteConversation: async (convId) => {
-        if (!confirm("Delete this conversation and all its attachments?")) return;
-        
-        try {
-            await api.delete(`/conversation/${convId}`);
-            if (state.currentConvId === convId) {
-                state.currentConvId = null;
-                state.attachments = [];
-                dom.chatMessages.classList.add('hidden');
-                dom.welcomeMessage.classList.remove('hidden');
-                renderAttachments([]);
-            }
-            await actions.loadConversations();
-            showToast('Conversation deleted');
-        } catch(err) {
-            showToast('Failed to delete conversation', 'error');
-        }
-    },
-
-    handleProjectClick: async (e) => {
-        const deleteButton = e.target.closest('.delete-btn');
-        if (deleteButton) {
-            e.stopPropagation();
-            await actions.handleDeleteProject(parseInt(deleteButton.dataset.projectId));
-            return;
-        }
-
-        const projectContainer = e.target.closest('.list-item');
-        if (!projectContainer) return;
-        
-        const projectId = parseInt(projectContainer.dataset.projectId);
-        if (!projectId || isNaN(projectId) || state.currentProjectId === projectId) return;
-
-        state.currentProjectId = projectId;
-        state.currentConvId = null;
-        state.conversations = [];
-        state.attachments = [];
-        
-        renderProjects();
-        renderConversations();
-        
-        dom.chatMessages.innerHTML = '';
-        dom.chatMessages.classList.add('hidden');
-        dom.welcomeMessage.classList.remove('hidden');
-        
-        await actions.loadConversations();
-        renderAttachments([]);
-        closeSidebars();
-    },
-
-    handleConvClick: async (e) => {
-        const deleteButton = e.target.closest('.delete-btn');
-        if (deleteButton) {
-            e.stopPropagation();
-            await actions.handleDeleteConversation(parseInt(deleteButton.dataset.convId));
-            return;
-        }
-
-        const convContainer = e.target.closest('.list-item');
-        if (!convContainer) return;
-        
-        const convId = parseInt(convContainer.dataset.convId);
-        if (!convId || isNaN(convId) || state.currentConvId === convId) return;
-
-        state.currentConvId = convId;
-        renderConversations();
-        
-        try {
-            const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
-            renderChats(chats);
-            await actions.loadAttachments();
-        } catch (err) {
-            showToast('Failed to load conversation', 'error');
-        }
-        
-        closeSidebars();
-    },
-
-    handleFileAttach: async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        if (!state.currentConvId) {
-            showToast('Select a conversation first', 'error');
-            return;
-        }
-        
-        // Check file size (max 1MB)
-        if (file.size > 1_000_000) {
-            showToast('File too large (max 1MB)', 'error');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            await fetch(`/api/conversation/${state.currentConvId}/attach`, {
-                method: 'POST',
-                body: formData
-            });
-            showToast(`✅ Attached: ${file.name}`);
-            await actions.loadAttachments();
-        } catch (err) {
-            showToast('Failed to attach file', 'error');
-        }
-        
-        dom.fileAttachInput.value = '';
-    },
-
-    handleDeleteAttachment: async (fileId) => {
-        if (!confirm('Delete this file and all its versions?')) return;
-        
-        try {
-            await api.delete(`/attachment/${fileId}`);
-            showToast('File deleted');
-            await actions.loadAttachments();
-        } catch (err) {
-            showToast('Failed to delete file', 'error');
-        }
-    },
-
-    handleDownloadAttachment: async (fileId, filename) => {
-        try {
-            const response = await fetch(`/api/attachment/${fileId}/download`);
-            if (!response.ok) throw new Error('Download failed');
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            
-            showToast(`Downloaded: ${filename}`);
-        } catch (err) {
-            showToast('Download failed', 'error');
-        }
-    },
-
-    handleViewVersions: async (fileId) => {
-        try {
-            const versions = await api.get(`/attachment/${fileId}/versions`);
-            
-            dom.modalTitle.textContent = "File Versions";
-            
-            let html = '<div class="versions-list">';
-            versions.forEach(v => {
-                const statusBadge = v.status === 'latest' ? '✨ Latest' : 
-                                  v.status === 'modified' ? '✏️ Modified' : 
-                                  '📄 Original';
-                const timestamp = new Date(v.updated_at).toLocaleString();
-                
-                html += `
-                    <div class="version-item">
-                        <div class="version-header">
-                            <span class="version-badge">${statusBadge}</span>
-                            <span class="version-num">v${v.version}</span>
-                            <span class="version-time">${timestamp}</span>
-                        </div>
-                        ${v.modification_summary ? `<div class="version-summary">${v.modification_summary}</div>` : ''}
-                        <div class="version-actions">
-                            <button class="btn-download" onclick="actions.handleDownloadAttachment(${v.id}, '${v.filename}')">
-                                <i class="fas fa-download"></i> Download
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            
-            dom.modalContent.innerHTML = html;
-            dom.githubModal.showModal();
-        } catch (err) {
-            showToast('Failed to load versions', 'error');
-        }
+export const renderProjects = () => {
+    dom.projectList.innerHTML = '';
+    if (state.projects.length === 0) {
+        dom.projectList.innerHTML = '<div class="empty-state">No projects yet</div>';
+    } else {
+        state.projects.forEach(p => {
+            const div = document.createElement('div');
+            div.className = `list-item ${p.id === state.currentProjectId ? 'active' : ''}`;
+            div.dataset.projectId = p.id;
+            div.innerHTML = `
+                <span class="list-item-text">${p.name}</span>
+                <button class="btn-icon delete-btn" data-project-id="${p.id}" title="Delete project">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+            dom.projectList.appendChild(div);
+        });
     }
 };
 
-// Expose actions globally for onclick handlers
-window.actions = actions;
+export const renderConversations = () => {
+    dom.convList.innerHTML = '';
+    dom.newConvBtn.disabled = !state.currentProjectId;
+    
+    if (!state.currentProjectId) {
+        dom.convList.innerHTML = '<div class="empty-state">Select a project first</div>';
+    } else if (state.conversations.length === 0) {
+        dom.convList.innerHTML = '<div class="empty-state">No conversations yet</div>';
+    } else {
+        state.conversations.forEach(c => {
+            const div = document.createElement('div');
+            div.className = `list-item ${c.id === state.currentConvId ? 'active' : ''}`;
+            div.dataset.convId = c.id;
+            div.innerHTML = `
+                <span class="list-item-text">${c.title}</span>
+                <button class="btn-icon delete-btn" data-conv-id="${c.id}" title="Delete conversation">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+            dom.convList.appendChild(div);
+        });
+    }
+};
+
+export const renderAttachments = (files) => {
+    dom.fileList.innerHTML = '';
+    dom.uploadFileBtn.disabled = !state.currentConvId;
+    
+    if (!state.currentConvId) {
+        dom.fileList.innerHTML = '<div class="empty-state">Select a conversation</div>';
+    } else if (files.length === 0) {
+        dom.fileList.innerHTML = '<div class="empty-state">No files attached<br><small>Click upload to add files</small></div>';
+    } else {
+        files.forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'attachment-item';
+            
+            const statusIcons = {
+                'original': '📄',
+                'modified': '✏️',
+                'latest': '✨'
+            };
+            const statusIcon = statusIcons[f.status] || '📄';
+            const sizeKB = (f.size_bytes / 1024).toFixed(1);
+            
+            div.innerHTML = `
+                <div class="attachment-header">
+                    <span class="attachment-icon">${statusIcon}</span>
+                    <span class="attachment-name" title="${f.filename}">${f.filename}</span>
+                    <span class="attachment-version">v${f.version}</span>
+                </div>
+                <div class="attachment-meta">
+                    <span class="attachment-size">${sizeKB} KB</span>
+                    ${f.modification_summary ? `<span class="attachment-summary">${f.modification_summary}</span>` : ''}
+                </div>
+                <div class="attachment-actions">
+                    <button class="btn-icon-small" onclick="actions.handleDownloadAttachment(${f.id}, '${f.filename}')" title="Download">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="btn-icon-small" onclick="actions.handleViewVersions(${f.id})" title="Version history">
+                        <i class="fas fa-history"></i>
+                    </button>
+                    <button class="btn-icon-small delete-btn" onclick="actions.handleDeleteAttachment(${f.id})" title="Delete file">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `;
+            dom.fileList.appendChild(div);
+        });
+    }
+};
+
+export const processCodeBlocks = (element) => {
+    element.querySelectorAll('pre code').forEach(block => {
+        if (block.dataset.highlighted) return;
+        hljs.highlightElement(block);
+        block.dataset.highlighted = 'true';
+        
+        const pre = block.parentElement;
+        if (pre.parentElement.classList.contains('code-block-wrapper')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(pre);
+        
+        const toolbar = document.createElement('div');
+        toolbar.className = 'code-toolbar';
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = 'Copy';
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(block.textContent).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+            });
+        };
+        toolbar.appendChild(copyBtn);
+        wrapper.appendChild(toolbar);
+    });
+};
+
+export const appendMessage = (role, content) => {
+    dom.welcomeMessage.classList.add('hidden');
+    dom.chatMessages.classList.remove('hidden');
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+    div.innerHTML = marked.parse(content);
+    dom.chatMessages.appendChild(div);
+    processCodeBlocks(div);
+    return div;
+};
+
+export const renderChats = (chats) => {
+    dom.welcomeMessage.classList.add('hidden');
+    dom.chatMessages.classList.remove('hidden');
+    dom.chatMessages.innerHTML = '';
+    chats.forEach(chat => {
+        appendMessage('user', chat.message);
+        appendMessage('ai', chat.ai_response);
+    });
+    dom.chatWindow.scrollTop = dom.chatWindow.scrollHeight;
+};
+
+export const closeSidebars = () => {
+    dom.sidebarLeft.classList.remove('open');
+    dom.sidebarRight.classList.remove('open');
+    dom.mobileOverlay.classList.add('hidden');
+};
