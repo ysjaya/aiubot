@@ -10,8 +10,7 @@ export const actions = {
             state.projects = await api.get('/projects');
             renderProjects();
         } catch (err) {
-            console.error(err);
-            showToast('Failed to load projects.', 'error');
+            showToast('Failed to load projects', 'error');
         }
     },
 
@@ -24,8 +23,7 @@ export const actions = {
             state.conversations = await api.get(`/project/${state.currentProjectId}/conversations`);
             renderConversations();
         } catch (err) {
-            console.error(err);
-            showToast('Failed to load conversations.', 'error');
+            showToast('Failed to load conversations', 'error');
         }
     },
 
@@ -35,33 +33,31 @@ export const actions = {
             const files = await api.get(`/project/${state.currentProjectId}/files`);
             renderFiles(files);
         } catch (err) {
-            console.error(err);
             renderFiles([]);
         }
     },
 
     handleNewProject: async () => {
-        const name = prompt("Enter new project name:");
-        if (!name || !name.trim()) return;
+        const name = prompt("Project name:");
+        if (!name?.trim()) return;
         
         try {
             await api.post(`/project?name=${encodeURIComponent(name.trim())}`);
-            showToast('Project created!', 'success');
+            showToast('Project created');
             await actions.loadProjects();
         } catch (err) {
-            console.error(err);
-            showToast('Failed to create project.', 'error');
+            showToast('Failed to create project', 'error');
         }
     },
 
     handleNewConversation: async () => {
         if (!state.currentProjectId) {
-            showToast('Please select a project first.', 'error');
+            showToast('Select a project first', 'error');
             return;
         }
         
-        const title = prompt("Enter conversation title:", "New Chat");
-        if (!title || !title.trim()) return;
+        const title = prompt("Conversation title:", "New Chat");
+        if (!title?.trim()) return;
         
         try {
             const newConv = await api.post(`/conversation?project_id=${state.currentProjectId}&title=${encodeURIComponent(title.trim())}`);
@@ -69,13 +65,12 @@ export const actions = {
             await actions.loadConversations();
             renderChats([]);
         } catch (err) {
-            console.error(err);
-            showToast('Failed to create conversation.', 'error');
+            showToast('Failed to create conversation', 'error');
         }
     },
 
     handleDeleteProject: async (projectId) => {
-        if (!confirm("Delete this project? All conversations and files will be lost!")) return;
+        if (!confirm("Delete this project? All data will be lost!")) return;
         
         try {
             await api.delete(`/project/${projectId}`);
@@ -89,10 +84,9 @@ export const actions = {
             }
             await actions.loadProjects();
             renderConversations();
-            showToast('Project deleted.', 'success');
+            showToast('Project deleted');
         } catch(err) {
-            console.error(err);
-            showToast('Failed to delete project.', 'error');
+            showToast('Failed to delete project', 'error');
         }
     },
 
@@ -107,10 +101,9 @@ export const actions = {
                 dom.welcomeMessage.classList.remove('hidden');
             }
             await actions.loadConversations();
-            showToast('Conversation deleted.', 'success');
+            showToast('Conversation deleted');
         } catch(err) {
-            console.error(err);
-            showToast('Failed to delete conversation.', 'error');
+            showToast('Failed to delete conversation', 'error');
         }
     },
 
@@ -165,8 +158,7 @@ export const actions = {
             const chats = await api.get(`/conversation/${state.currentConvId}/chats`);
             renderChats(chats);
         } catch (err) {
-            showToast('Failed to load chats.', 'error');
-            console.error(err);
+            showToast('Failed to load chats', 'error');
         }
         
         closeSidebars();
@@ -177,7 +169,7 @@ export const actions = {
         if (!file) return;
         
         if (!state.currentProjectId) {
-            showToast('Please select a project first.', 'error');
+            showToast('Select a project first', 'error');
             return;
         }
         
@@ -189,10 +181,10 @@ export const actions = {
                 method: 'POST', 
                 body: formData 
             });
-            showToast('File uploaded successfully!', 'success');
+            showToast('File uploaded');
             await actions.loadFiles();
         } catch (err) {
-            showToast('File upload failed.', 'error');
+            showToast('File upload failed', 'error');
         }
         
         dom.fileUploadInput.value = '';
@@ -200,12 +192,12 @@ export const actions = {
 
     handleGitHubImportClick: async () => {
         if (!state.currentProjectId) {
-            showToast('Please select a project first.', 'error');
+            showToast('Select a project first', 'error');
             return;
         }
 
         if (!isAuthenticated()) {
-            if (confirm('You need to login with GitHub first. Login now?')) {
+            if (confirm('Login with GitHub first?')) {
                 loginWithGitHub();
             }
             return;
@@ -213,41 +205,66 @@ export const actions = {
 
         dom.githubModal.showModal();
         dom.modalTitle.textContent = "Your Repositories";
-        dom.modalContent.innerHTML = '<em>Loading repositories...</em>';
+        dom.modalContent.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">Loading...</div>';
         
         try {
             const repos = await api.get('/github/repos', true);
-            const repoList = repos.map(repo => `<li class="github-repo-list-item" data-repo-fullname="${repo.full_name}">${repo.full_name}</li>`).join('');
-            dom.modalContent.innerHTML = `<ul class="github-repo-list">${repoList}</ul>`;
+            state.githubRepos = repos;
+            state.selectedRepos = new Set();
+            
+            let html = '<div>';
+            repos.forEach(repo => {
+                html += `
+                    <div class="repo-item" data-repo="${repo.full_name}">
+                        <input type="checkbox" class="checkbox repo-checkbox" data-repo="${repo.full_name}">
+                        <span>${repo.full_name}</span>
+                    </div>
+                `;
+            });
+            html += '<button class="btn-import" id="import-repos-btn" disabled>Import Selected</button></div>';
+            
+            dom.modalContent.innerHTML = html;
+            
+            dom.modalContent.querySelectorAll('.repo-checkbox').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const repo = e.target.dataset.repo;
+                    if (e.target.checked) {
+                        state.selectedRepos.add(repo);
+                    } else {
+                        state.selectedRepos.delete(repo);
+                    }
+                    document.getElementById('import-repos-btn').disabled = state.selectedRepos.size === 0;
+                });
+            });
+            
+            document.getElementById('import-repos-btn').addEventListener('click', actions.handleImportRepos);
+            
         } catch (err) {
-            dom.modalContent.innerHTML = '<p>Could not load repositories. Your token might be invalid or expired. <button onclick="window.location.href=\'/api/auth/login\'">Login Again</button></p>';
+            dom.modalContent.innerHTML = '<div style="padding:20px;color:var(--error-color);">Failed to load repositories. <button class="btn-import" onclick="window.location.href=\'/api/auth/login\'">Login Again</button></div>';
         }
     },
 
-    handleRepoSelect: async (repoFullname) => {
-        state.selectedRepo = repoFullname;
-        dom.modalTitle.textContent = `Files in ${repoFullname}`;
-        dom.modalContent.innerHTML = '<em>Loading files...</em>';
+    handleImportRepos: async () => {
+        if (state.selectedRepos.size === 0) return;
+        
+        const importBtn = document.getElementById('import-repos-btn');
+        importBtn.disabled = true;
+        importBtn.textContent = 'Importing...';
         
         try {
-            const files = await api.get(`/github/repo-files?repo_fullname=${encodeURIComponent(repoFullname)}`, true);
-            const fileList = files.map(file => `<li class="github-file-list-item" data-file-path="${file}">${file}</li>`).join('');
-            dom.modalContent.innerHTML = `<ul class="github-file-list">${fileList}</ul>`;
-        } catch (err) {
-            dom.modalContent.innerHTML = '<p>Failed to load files.</p>';
-        }
-    },
-
-    handleFileImport: async (filePath) => {
-        if (!state.currentProjectId || !state.selectedRepo) return;
-        
-        try {
-            await api.post(`/github/import-file?project_id=${state.currentProjectId}&repo_fullname=${encodeURIComponent(state.selectedRepo)}&file_path=${encodeURIComponent(filePath)}`, {}, true);
-            showToast(`Imported ${filePath}!`, 'success');
+            const reposArray = Array.from(state.selectedRepos);
+            await api.post(`/github/import-repos`, {
+                project_id: state.currentProjectId,
+                repos: reposArray
+            }, true);
+            
+            showToast(`Imported ${reposArray.length} repository(ies)`);
             await actions.loadFiles();
             dom.githubModal.close();
-        } catch(err) {
-            showToast('Failed to import file.', 'error');
+        } catch (err) {
+            showToast('Failed to import repositories', 'error');
+            importBtn.disabled = false;
+            importBtn.textContent = 'Import Selected';
         }
     }
 };
