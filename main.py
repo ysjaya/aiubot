@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.core.config import settings
-from app.db.database import init_main_database
+from app.db.database import init_db # <-- UBAH INI
 from app.api import routers, chat
 
 # Configure logging
@@ -21,10 +21,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for startup and shutdown"""
-    # Startup
     logger.info("🚀 Starting AI Code Assistant...")
     try:
-        init_main_database()
+        init_db() # <-- UBAH INI
         logger.info("✅ Database initialized")
     except Exception as e:
         logger.error(f"❌ Failed to initialize database: {e}")
@@ -32,7 +31,6 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Shutdown
     logger.info("👋 Shutting down AI Code Assistant...")
 
 # Create FastAPI app
@@ -46,7 +44,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,15 +90,6 @@ async def root(request: Request):
     return {
         "message": "AI Code Assistant API",
         "version": "2.0.0",
-        "features": [
-            "Project isolation with separate databases",
-            "File versioning (Original → Modified → Latest)",
-            "Intelligent file analysis and updates",
-            "Claude-style attachment system",
-            "Download and delete files",
-            "Web search integration",
-            "Streaming AI responses"
-        ],
         "docs": "/docs"
     }
 
