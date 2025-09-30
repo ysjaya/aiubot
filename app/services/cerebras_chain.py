@@ -1,3 +1,6 @@
+# filename: app/services/cerebras_chain.py
+# BAGIAN 1 DARI 2
+
 import os
 import json
 import asyncio
@@ -9,7 +12,7 @@ from sqlmodel import Session, select
 from datetime import datetime
 
 from app.db import models
-from app.db.database import get_project_session
+from app.db.database import get_session
 from app.core.config import settings
 from app.services import web_tools
 
@@ -98,151 +101,8 @@ Respond in well-formatted Markdown."""
 
 PROMPT_FILE_ANALYZER = """Analyze this specific file in detail:
 
-FILE: {filename} (v{version}, {status})
-```
-{content}
-```
-
-Provide:
-1. **Purpose**: What does this file do?
-2. **Key Functions/Classes**: Main components
-3. **Dependencies**: What it imports/requires
-4. **Code Quality**: Issues or improvements
-5. **Integration**: How it relates to other project files
-
-Be specific and actionable."""
-
-PROMPT_INTELLIGENT_UPDATE = """You are updating code based on user request. Be intelligent and precise.
-
-CURRENT FILE: {filename} (v{version})
-```
-{current_content}
-```
-
-PROJECT CONTEXT:
-{project_files}
-
-CONVERSATION:
-User: {user_request}
-
-AI Previous Response: {ai_response}
-
-Generate the COMPLETE updated file. Include:
-- All necessary imports
-- All functions/classes (even unchanged ones)
-- Proper error handling
-- Comments for new/changed code
-
-Also provide a concise summary (2-3 sentences) of what changed and why.
-
-Respond in JSON:
-{{
-    "content": "complete updated file content",
-    "summary": "brief explanation of changes",
-    "changes": ["list", "of", "key", "changes"]
-}}"""
-
-# ==================== HELPER FUNCTIONS ====================
-
-async def call_cerebras(messages, model="llama-4-maverick-17b-128e-instruct", **kwargs):
-    """Non-streaming Cerebras call with error handling"""
-    if not cerebras_client:
-        logger.error("Cerebras client not initialized")
-        return "Error: AI service not available. Please check API configuration."
-    
-    try:
-        response = await asyncio.to_thread(
-            cerebras_client.chat.completions.create,
-            messages=messages,
-            model=model,
-            max_tokens=kwargs.get('max_tokens', 2000),
-            temperature=kwargs.get('temperature', 0.7)
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"Cerebras API error: {e}", exc_info=True)
-        return f"Error: AI service unavailable - {str(e)[:100]}"
-
-def stream_cerebras(messages, model="llama-4-maverick-17b-128e-instruct", **kwargs):
-    """Streaming Cerebras call with error handling"""
-    if not cerebras_client:
-        raise Exception("Cerebras client not initialized")
-    
-    try:
-        return cerebras_client.chat.completions.create(
-            messages=messages,
-            model=model,
-            stream=True,
-            max_tokens=kwargs.get('max_tokens', 2000),
-            temperature=kwargs.get('temperature', 0.7)
-        )
-    except Exception as e:
-        logger.error(f"Cerebras streaming error: {e}", exc_info=True)
-        raise
-
-async def get_conversation_context(
-    conv_id: int,
-    project_database: str,
-    max_files: int = 20
-) -> tuple:
-    """Get conversation context: files + history"""
-    
-    try:
-        with next(get_project_session(project_database)) as session:
-            # Get latest attachments
-            attachments = session.exec(
-                select(models.Attachment)
-                .where(models.Attachment.conversation_id == conv_id)
-                .where(models.Attachment.status.in_([
-                    models.FileStatus.LATEST,
-                    models.FileStatus.ORIGINAL
-                ]))
-                .order_by(models.Attachment.updated_at.desc())
-                .limit(max_files)
-            ).all()
-            
-            # Build file context
-            file_contexts = []
-            if attachments:
-                for att in attachments:
-                    status_emoji = {
-                        models.FileStatus.ORIGINAL: "📄",
-                        models.FileStatus.LATEST: "✨",
-                        models.FileStatus.MODIFIED: "✏️"
-                    }.get(att.status, "📄")
-                    
-                    file_info = f"\n{'='*60}\n"
-                    file_info += f"{status_emoji} FILE: {att.filename} (v{att.version})\n"
-                    
-                    if att.modification_summary:
-                        file_info += f"Last Change: {att.modification_summary}\n"
-                    
-                    file_info += f"{'='*60}\n"
-                    file_info += f"```\n{att.content}\n```\n"
-                    
-                    file_contexts.append(file_info)
-            
-            # Get recent chat history
-            recent_chats = session.exec(
-                select(models.Chat)
-                .where(models.Chat.conversation_id == conv_id)
-                .order_by(models.Chat.created_at.desc())
-                .limit(10)
-            ).all()
-            
-            chat_history = []
-            if recent_chats:
-                for chat in reversed(recent_chats):
-                    chat_history.append(f"User: {chat.message}")
-                    # Truncate long AI responses
-                    response = chat.ai_response[:1000] + ("..." if len(chat.ai_response) > 1000 else "")
-                    chat_history.append(f"AI: {response}")
-            
-            return "\n".join(file_contexts), "\n".join(chat_history), list(attachments)
-    
-    except Exception as e:
-        logger.error(f"Error getting conversation context: {e}", exc_info=True)
-        return "", "", []
+# filename: app/services/cerebras_chain.py
+# BAGIAN 2 DARI 2
 
 def detect_code_blocks_with_filenames(response: str) -> List[Dict]:
     """Intelligently detect code blocks that should update files"""
@@ -409,13 +269,11 @@ async def intelligent_file_update(
 async def ai_chain_stream(
     messages,
     project_id: int,
-    conv_id: int,
-    project_database: str
+    conv_id: int
 ):
     """
     Enhanced AI chain with intelligent file analysis and updates
     """
-    
     user_query = messages[-1]['content']
     logger.info(f"[AI CHAIN] Starting for conv {conv_id}")
     logger.info(f"[AI CHAIN] Query: {user_query[:100]}...")
@@ -436,8 +294,7 @@ async def ai_chain_stream(
         })
         
         file_context, chat_history, attachments = await get_conversation_context(
-            conv_id,
-            project_database
+            conv_id
         )
         
         if not file_context:
@@ -505,7 +362,7 @@ async def ai_chain_stream(
                 yield char
             
             # Save to database
-            with next(get_project_session(project_database)) as session:
+            with next(get_session()) as session:
                 db_chat = models.Chat(
                     conversation_id=conv_id,
                     user="user",
@@ -599,7 +456,7 @@ async def ai_chain_stream(
                 
                 updated_files = []
                 
-                with next(get_project_session(project_database)) as session:
+                with next(get_session()) as session:
                     for file_update in files_to_update:
                         att = file_update['attachment']
                         
@@ -640,7 +497,7 @@ async def ai_chain_stream(
         # STAGE 6: Save to database
         yield json.dumps({"status": "done"})
         
-        with next(get_project_session(project_database)) as session:
+        with next(get_session()) as session:
             db_chat = models.Chat(
                 conversation_id=conv_id,
                 user="user",
@@ -661,3 +518,4 @@ async def ai_chain_stream(
             "status": "error",
             "message": f"Server error: {str(e)[:100]}"
         })
+FILE: {filename} (v{version}, {status})
