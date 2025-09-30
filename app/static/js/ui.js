@@ -1,6 +1,5 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { actions } from './actions.js';
 
 export const setLoading = (loading, message = 'Ready') => {
     state.isLoading = loading;
@@ -25,7 +24,7 @@ export const autoResizeTextarea = () => {
 export const renderProjects = () => {
     dom.projectList.innerHTML = '';
     if (state.projects.length === 0) {
-        dom.projectList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No projects yet</div>';
+        dom.projectList.innerHTML = '<div class="empty-state">No projects yet</div>';
     } else {
         state.projects.forEach(p => {
             const div = document.createElement('div');
@@ -33,7 +32,7 @@ export const renderProjects = () => {
             div.dataset.projectId = p.id;
             div.innerHTML = `
                 <span class="list-item-text">${p.name}</span>
-                <button class="btn-icon delete-btn" data-project-id="${p.id}">
+                <button class="btn-icon delete-btn" data-project-id="${p.id}" title="Delete project">
                     <i class="fas fa-trash-alt"></i>
                 </button>
             `;
@@ -47,9 +46,9 @@ export const renderConversations = () => {
     dom.newConvBtn.disabled = !state.currentProjectId;
     
     if (!state.currentProjectId) {
-        dom.convList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">Select a project first</div>';
+        dom.convList.innerHTML = '<div class="empty-state">Select a project first</div>';
     } else if (state.conversations.length === 0) {
-        dom.convList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No conversations yet</div>';
+        dom.convList.innerHTML = '<div class="empty-state">No conversations yet</div>';
     } else {
         state.conversations.forEach(c => {
             const div = document.createElement('div');
@@ -57,7 +56,7 @@ export const renderConversations = () => {
             div.dataset.convId = c.id;
             div.innerHTML = `
                 <span class="list-item-text">${c.title}</span>
-                <button class="btn-icon delete-btn" data-conv-id="${c.id}">
+                <button class="btn-icon delete-btn" data-conv-id="${c.id}" title="Delete conversation">
                     <i class="fas fa-trash-alt"></i>
                 </button>
             `;
@@ -68,26 +67,23 @@ export const renderConversations = () => {
 
 export const renderAttachments = (files) => {
     dom.fileList.innerHTML = '';
-    dom.attachFileBtn.disabled = !state.currentConvId;
+    dom.uploadFileBtn.disabled = !state.currentConvId;
     
     if (!state.currentConvId) {
-        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">Select a conversation</div>';
+        dom.fileList.innerHTML = '<div class="empty-state">Select a conversation</div>';
     } else if (files.length === 0) {
-        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No files attached</div>';
+        dom.fileList.innerHTML = '<div class="empty-state">No files attached<br><small>Click upload to add files</small></div>';
     } else {
         files.forEach(f => {
             const div = document.createElement('div');
             div.className = 'attachment-item';
             
-            // Status badge
             const statusIcons = {
                 'original': '📄',
                 'modified': '✏️',
                 'latest': '✨'
             };
             const statusIcon = statusIcons[f.status] || '📄';
-            
-            // File size
             const sizeKB = (f.size_bytes / 1024).toFixed(1);
             
             div.innerHTML = `
@@ -104,10 +100,10 @@ export const renderAttachments = (files) => {
                     <button class="btn-icon-small" onclick="actions.handleDownloadAttachment(${f.id}, '${f.filename}')" title="Download">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="btn-icon-small" onclick="actions.handleViewVersions(${f.id})" title="View versions">
+                    <button class="btn-icon-small" onclick="actions.handleViewVersions(${f.id})" title="Version history">
                         <i class="fas fa-history"></i>
                     </button>
-                    <button class="btn-icon-small delete-btn" onclick="actions.handleDeleteAttachment(${f.id})" title="Delete">
+                    <button class="btn-icon-small delete-btn" onclick="actions.handleDeleteAttachment(${f.id})" title="Delete file">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
