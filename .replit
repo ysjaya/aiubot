@@ -35,6 +35,10 @@ waitForPort = 5000
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 41629
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port"]
