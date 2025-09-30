@@ -1,5 +1,6 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
+import { actions } from './actions.js';
 
 export const setLoading = (loading, message = 'Ready') => {
     state.isLoading = loading;
@@ -65,15 +66,52 @@ export const renderConversations = () => {
     }
 };
 
-export const renderFiles = (files) => {
+export const renderAttachments = (files) => {
     dom.fileList.innerHTML = '';
-    if (files.length === 0) {
-        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No files yet</div>';
+    dom.attachFileBtn.disabled = !state.currentConvId;
+    
+    if (!state.currentConvId) {
+        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">Select a conversation</div>';
+    } else if (files.length === 0) {
+        dom.fileList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px;">No files attached</div>';
     } else {
         files.forEach(f => {
             const div = document.createElement('div');
-            div.className = 'list-item';
-            div.innerHTML = `<span class="list-item-text" title="${f.path}">${f.path}</span>`;
+            div.className = 'attachment-item';
+            
+            // Status badge
+            const statusIcons = {
+                'original': '📄',
+                'modified': '✏️',
+                'latest': '✨'
+            };
+            const statusIcon = statusIcons[f.status] || '📄';
+            
+            // File size
+            const sizeKB = (f.size_bytes / 1024).toFixed(1);
+            
+            div.innerHTML = `
+                <div class="attachment-header">
+                    <span class="attachment-icon">${statusIcon}</span>
+                    <span class="attachment-name" title="${f.filename}">${f.filename}</span>
+                    <span class="attachment-version">v${f.version}</span>
+                </div>
+                <div class="attachment-meta">
+                    <span class="attachment-size">${sizeKB} KB</span>
+                    ${f.modification_summary ? `<span class="attachment-summary">${f.modification_summary}</span>` : ''}
+                </div>
+                <div class="attachment-actions">
+                    <button class="btn-icon-small" onclick="actions.handleDownloadAttachment(${f.id}, '${f.filename}')" title="Download">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="btn-icon-small" onclick="actions.handleViewVersions(${f.id})" title="View versions">
+                        <i class="fas fa-history"></i>
+                    </button>
+                    <button class="btn-icon-small delete-btn" onclick="actions.handleDeleteAttachment(${f.id})" title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `;
             dom.fileList.appendChild(div);
         });
     }
