@@ -302,7 +302,7 @@ async def commit_all_conversation_files(
         )
         
         if result["success"]:
-            logger.info(f"✅ Committed {result['files_count']} files to {request.repo_fullname}")
+            logger.info(f"✅ Committed {result['file_count']} files to {request.repo_fullname}")
             return result
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Commit failed"))
