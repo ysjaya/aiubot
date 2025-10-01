@@ -28,12 +28,16 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python -m uvicorn main:app --host localhost --port 8000 --reload & sleep 3 && cd frontend && npm run dev"
+args = "bash start_dev.sh"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 40369
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
