@@ -147,6 +147,38 @@ async def import_files_from_github(
         logger.error(f"Failed to import files: {e}")
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
+@router.get("/repo/{owner}/{repo}/branches")
+async def get_repo_branches(
+    owner: str,
+    repo: str,
+    github_token: str = Depends(get_github_token)
+):
+    """Get list of branches for a repository"""
+    try:
+        from github import Github, Auth
+        
+        auth = Auth.Token(github_token)
+        g = Github(auth=auth)
+        repo_obj = g.get_repo(f"{owner}/{repo}")
+        
+        branches = []
+        for branch in repo_obj.get_branches():
+            branches.append({
+                "name": branch.name,
+                "protected": branch.protected,
+                "commit_sha": branch.commit.sha[:7]
+            })
+        
+        return {
+            "success": True,
+            "repo": f"{owner}/{repo}",
+            "branches": branches
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get branches: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/repo/{owner}/{repo}/import-preview")
 async def preview_repo_import(
     owner: str,

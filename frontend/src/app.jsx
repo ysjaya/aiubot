@@ -120,6 +120,8 @@ function App() {
   const [commitMessage, setCommitMessage] = useState('');
   const [commitBasePath, setCommitBasePath] = useState('');
   const [committing, setCommitting] = useState(false);
+  const [repoBranches, setRepoBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   
   // Refs
   const chatEndRef = useRef(null);
@@ -577,6 +579,53 @@ function App() {
 
   // ==================== COMMIT FUNCTIONS ====================
 
+  const loadRepoBranches = async (repoFullName) => {
+    if (!repoFullName) return;
+    
+    setLoadingBranches(true);
+    try {
+      const [owner, repo] = repoFullName.split('/');
+      const res = await fetch(`${API_URL}/api/github/repo/${owner}/${repo}/branches`, {
+        headers: { 'Authorization': `Bearer ${githubToken}` }
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to load branches');
+      }
+      
+      const data = await res.json();
+      setRepoBranches(data.branches || []);
+      
+      // Auto-select main/master if available
+      if (data.branches && data.branches.length > 0) {
+        const mainBranch = data.branches.find(b => b.name === 'main' || b.name === 'master');
+        setCommitBranch(mainBranch ? mainBranch.name : data.branches[0].name);
+      }
+    } catch (err) {
+      console.error('Failed to load branches:', err);
+      setRepoBranches([]);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
+
+  const detectImportedRepo = () => {
+    // Find repository from imported files' metadata
+    for (const att of attachments) {
+      if (att.import_source === 'github' && att.import_metadata) {
+        try {
+          const metadata = JSON.parse(att.import_metadata);
+          if (metadata.repo) {
+            return metadata.repo;
+          }
+        } catch (e) {
+          console.error('Failed to parse import metadata:', e);
+        }
+      }
+    }
+    return null;
+  };
+
   const openCommitModal = () => {
     if (!selectedConv) {
       alert('Pilih percakapan terlebih dahulu');
@@ -597,9 +646,20 @@ function App() {
     setShowCommitModal(true);
     setCommitMessage(`Update ${attachments.length} file(s) from AI Code Assistant`);
     
-    // Auto-load repos if needed
-    if (githubRepos.length === 0) {
-      loadGitHubRepos();
+    // Auto-detect and lock repository from imported files
+    const detectedRepo = detectImportedRepo();
+    if (detectedRepo) {
+      setCommitRepoName(detectedRepo);
+      loadRepoBranches(detectedRepo);
+    } else {
+      setCommitRepoName('');
+      setRepoBranches([]);
+      setCommitBranch('main');
+      
+      // Auto-load repos if needed
+      if (githubRepos.length === 0) {
+        loadGitHubRepos();
+      }
     }
   };
 
@@ -993,30 +1053,67 @@ function App() {
             <div className="modal-body">
               <div className="form-group">
                 <label>Repository *</label>
-                <select
-                  value={commitRepoName}
-                  onChange={(e) => setCommitRepoName(e.target.value)}
-                  disabled={committing}
-                >
-                  <option value="">-- Pilih Repository --</option>
-                  {githubRepos.map(repo => (
-                    <option key={repo.full_name} value={repo.full_name}>
-                      {repo.full_name} {repo.private ? '🔒' : ''}
-                    </option>
-                  ))}
-                </select>
+                {detectImportedRepo() ? (
+                  <>
+                    <input
+                      type="text"
+                      value={commitRepoName}
+                      readOnly
+                      disabled
+                      style={{ backgroundColor: '#2a2a2a', color: '#999' }}
+                    />
+                    <small>🔒 Repository terkunci (dari file import GitHub)</small>
+                  </>
+                ) : (
+                  <select
+                    value={commitRepoName}
+                    onChange={(e) => {
+                      setCommitRepoName(e.target.value);
+                      loadRepoBranches(e.target.value);
+                    }}
+                    disabled={committing}
+                  >
+                    <option value="">-- Pilih Repository --</option>
+                    {githubRepos.map(repo => (
+                      <option key={repo.full_name} value={repo.full_name}>
+                        {repo.full_name} {repo.private ? '🔒' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="form-group">
-                <label>Branch</label>
-                <input
-                  type="text"
-                  value={commitBranch}
-                  onChange={(e) => setCommitBranch(e.target.value)}
-                  placeholder="main"
-                  disabled={committing}
-                />
-                <small>Branch akan dibuat otomatis jika belum ada</small>
+                <label>Branch *</label>
+                {loadingBranches ? (
+                  <input type="text" value="⏳ Loading branches..." readOnly disabled />
+                ) : repoBranches.length > 0 ? (
+                  <>
+                    <select
+                      value={commitBranch}
+                      onChange={(e) => setCommitBranch(e.target.value)}
+                      disabled={committing}
+                    >
+                      {repoBranches.map(branch => (
+                        <option key={branch.name} value={branch.name}>
+                          {branch.name} {branch.protected ? '🔒' : ''} ({branch.commit_sha})
+                        </option>
+                      ))}
+                    </select>
+                    <small>Pilih branch tujuan commit</small>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={commitBranch}
+                      onChange={(e) => setCommitBranch(e.target.value)}
+                      placeholder="main"
+                      disabled={committing}
+                    />
+                    <small>Branch akan dibuat otomatis jika belum ada</small>
+                  </>
+                )}
               </div>
 
               <div className="form-group">
