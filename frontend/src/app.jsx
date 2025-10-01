@@ -87,8 +87,6 @@ function TypewriterText({ text, speed = 30 }) {
 
 function App() {
   // State management
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [selectedConv, setSelectedConv] = useState(null);
   const [chats, setChats] = useState([]);
@@ -99,15 +97,12 @@ function App() {
   const [streamingLines, setStreamingLines] = useState([]);
   
   // UI state
-  const [showNewProject, setShowNewProject] = useState(false);
-  const [showNewConv, setShowNewConv] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showCommitModal, setShowCommitModal] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newConvTitle, setNewConvTitle] = useState('');
   const [codeCanvas, setCodeCanvas] = useState(null);
+  const [isFirstMessage, setIsFirstMessage] = useState(true);
   
   // GitHub state
   const [githubRepos, setGithubRepos] = useState([]);
@@ -135,9 +130,9 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chats, streamingLines]);
 
-  // Load projects on mount
+  // Load conversations on mount
   useEffect(() => {
-    loadProjects();
+    loadConversations();
   }, []);
 
   // Check for GitHub auth token in URL
@@ -152,69 +147,24 @@ function App() {
     }
   }, []);
 
-  // Load conversations when project selected
-  useEffect(() => {
-    if (selectedProject) {
-      loadConversations(selectedProject.id);
-    }
-  }, [selectedProject]);
-
   // Load chats and attachments when conversation selected
   useEffect(() => {
-    if (selectedConv && selectedProject) {
+    if (selectedConv) {
       loadChats(selectedConv.id);
       loadAttachments(selectedConv.id);
+      // Check if this conversation has chats to determine if it's first message
+      fetch(`${API_URL}/api/conversation/${selectedConv.id}/chats`)
+        .then(res => res.json())
+        .then(data => setIsFirstMessage(data.length === 0))
+        .catch(() => setIsFirstMessage(true));
     }
-  }, [selectedConv, selectedProject]);
+  }, [selectedConv]);
 
   // ==================== API CALLS ====================
 
-  const loadProjects = async () => {
+  const loadConversations = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/projects`);
-      const data = await res.json();
-      setProjects(data);
-    } catch (err) {
-      console.error('Failed to load projects:', err);
-    }
-  };
-
-  const createProject = async () => {
-    if (!newProjectName.trim()) return;
-    try {
-      const res = await fetch(`${API_URL}/api/project?name=${encodeURIComponent(newProjectName)}`, {
-        method: 'POST'
-      });
-      const project = await res.json();
-      setProjects([project, ...projects]);
-      setSelectedProject(project);
-      setNewProjectName('');
-      setShowNewProject(false);
-    } catch (err) {
-      console.error('Failed to create project:', err);
-      alert('Gagal membuat project');
-    }
-  };
-
-  const deleteProject = async (projectId) => {
-    if (!confirm('Hapus project ini? Semua percakapan dan file akan terhapus!')) return;
-    try {
-      await fetch(`${API_URL}/api/project/${projectId}`, { method: 'DELETE' });
-      setProjects(projects.filter(p => p.id !== projectId));
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(null);
-        setConversations([]);
-        setSelectedConv(null);
-      }
-    } catch (err) {
-      console.error('Failed to delete project:', err);
-      alert('Gagal menghapus project');
-    }
-  };
-
-  const loadConversations = async (projectId) => {
-    try {
-      const res = await fetch(`${API_URL}/api/project/${projectId}/conversations`);
+      const res = await fetch(`${API_URL}/api/conversations`);
       const data = await res.json();
       setConversations(data);
     } catch (err) {
@@ -222,28 +172,55 @@ function App() {
     }
   };
 
-  const createConversation = async () => {
-    if (!newConvTitle.trim() || !selectedProject) return;
+  const createNewConversation = async () => {
     try {
-      const res = await fetch(
-        `${API_URL}/api/conversation?project_id=${selectedProject.id}&title=${encodeURIComponent(newConvTitle)}`,
-        { method: 'POST' }
-      );
+      const res = await fetch(`${API_URL}/api/conversation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: "New Conversation" })
+      });
       const conv = await res.json();
       setConversations([conv, ...conversations]);
       setSelectedConv(conv);
-      setNewConvTitle('');
-      setShowNewConv(false);
+      setIsFirstMessage(true);
+      setChats([]);
+      setAttachments([]);
     } catch (err) {
       console.error('Failed to create conversation:', err);
       alert('Gagal membuat percakapan');
     }
   };
 
-  const deleteConversation = async (convId) => {
-    if (!confirm('Hapus percakapan ini?')) return;
+  const autoNameConversation = async (convId, firstMessage) => {
     try {
-      await fetch(`${API_URL}/api/conversation/${convId}?project_id=${selectedProject.id}`, {
+      const res = await fetch(`${API_URL}/api/conversation/auto-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: firstMessage })
+      });
+      const data = await res.json();
+      
+      if (data.success && data.title) {
+        // Update conversation title
+        await fetch(`${API_URL}/api/conversation/${convId}?title=${encodeURIComponent(data.title)}`, {
+          method: 'PATCH'
+        });
+        
+        // Reload conversations to show new title
+        loadConversations();
+        
+        // Update selectedConv title
+        setSelectedConv(prev => ({ ...prev, title: data.title }));
+      }
+    } catch (err) {
+      console.error('Failed to auto-name conversation:', err);
+    }
+  };
+
+  const deleteConversation = async (convId) => {
+    if (!confirm('Hapus percakapan ini? Semua chat dan file akan terhapus!')) return;
+    try {
+      await fetch(`${API_URL}/api/conversation/${convId}`, {
         method: 'DELETE'
       });
       setConversations(conversations.filter(c => c.id !== convId));
@@ -260,7 +237,7 @@ function App() {
 
   const loadChats = async (convId) => {
     try {
-      const res = await fetch(`${API_URL}/api/conversation/${convId}/chats?project_id=${selectedProject.id}`);
+      const res = await fetch(`${API_URL}/api/conversation/${convId}/chats`);
       const data = await res.json();
       setChats(data);
     } catch (err) {
@@ -270,7 +247,7 @@ function App() {
 
   const loadAttachments = async (convId) => {
     try {
-      const res = await fetch(`${API_URL}/api/conversation/${convId}/attachments?project_id=${selectedProject.id}`);
+      const res = await fetch(`${API_URL}/api/conversation/${convId}/attachments`);
       const data = await res.json();
       setAttachments(data);
     } catch (err) {
@@ -279,7 +256,7 @@ function App() {
   };
 
   const uploadFile = async (file) => {
-    if (!selectedConv || !selectedProject) {
+    if (!selectedConv) {
       alert('Pilih percakapan terlebih dahulu');
       return;
     }
@@ -289,7 +266,7 @@ function App() {
 
     try {
       const res = await fetch(
-        `${API_URL}/api/conversation/${selectedConv.id}/attach?project_id=${selectedProject.id}`,
+        `${API_URL}/api/conversation/${selectedConv.id}/attach`,
         {
           method: 'POST',
           body: formData
@@ -311,7 +288,7 @@ function App() {
     if (!confirm('Hapus file ini dan semua versinya?')) return;
     
     try {
-      await fetch(`${API_URL}/api/attachment/${fileId}?project_id=${selectedProject.id}`, {
+      await fetch(`${API_URL}/api/attachment/${fileId}`, {
         method: 'DELETE'
       });
       setAttachments(attachments.filter(a => a.id !== fileId));
@@ -324,7 +301,7 @@ function App() {
 
   const downloadFile = async (fileId, filename) => {
     try {
-      const res = await fetch(`${API_URL}/api/attachment/${fileId}/download?project_id=${selectedProject.id}`);
+      const res = await fetch(`${API_URL}/api/attachment/${fileId}/download`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -341,9 +318,11 @@ function App() {
   };
 
   const sendMessage = async () => {
-    if (!message.trim() || !selectedConv || !selectedProject || loading) return;
+    if (!message.trim() || !selectedConv || loading) return;
 
     const userMessage = message;
+    const firstMsg = isFirstMessage;
+    
     setMessage('');
     setLoading(true);
     setStreamingResponse('');
@@ -359,7 +338,7 @@ function App() {
     setChats([...chats, tempChat]);
 
     try {
-      const res = await fetch(`${API_URL}/api/chat/${selectedConv.id}?project_id=${selectedProject.id}`, {
+      const res = await fetch(`${API_URL}/api/chat/${selectedConv.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage })
@@ -413,6 +392,12 @@ function App() {
       // Add remaining line if any
       if (currentLine.trim()) {
         setStreamingLines(prev => [...prev, currentLine]);
+      }
+
+      // Auto-name conversation if this was first message
+      if (firstMsg) {
+        await autoNameConversation(selectedConv.id, userMessage);
+        setIsFirstMessage(false);
       }
 
       await loadChats(selectedConv.id);
@@ -525,7 +510,7 @@ function App() {
       return;
     }
 
-    if (!selectedConv || !selectedProject) {
+    if (!selectedConv) {
       alert('Pilih percakapan terlebih dahulu');
       return;
     }
@@ -542,8 +527,7 @@ function App() {
         body: JSON.stringify({
           repo_fullname: selectedRepo.full_name,
           file_paths: Array.from(selectedFiles),
-          conversation_id: selectedConv.id,
-          project_id: selectedProject.id
+          conversation_id: selectedConv.id
         })
       });
 
@@ -645,7 +629,6 @@ function App() {
         body: JSON.stringify({
           repo_fullname: commitRepoName,
           conversation_id: selectedConv.id,
-          project_id: selectedProject.id,
           branch: commitBranch || 'main',
           commit_message: commitMessage,
           base_path: commitBasePath
@@ -721,64 +704,10 @@ function App() {
       {/* SIDEBAR */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>🤖 AI Code</h2>
+          <h2>🤖 AI Code Assistant</h2>
           <button className="btn-icon" onClick={() => setShowFileManager(!showFileManager)}>
             📁
           </button>
-        </div>
-
-        {/* PROJECTS */}
-        <div className="sidebar-section">
-          <div className="section-header">
-            <h3>Projects</h3>
-            <button className="btn-icon" onClick={() => setShowNewProject(!showNewProject)}>
-              +
-            </button>
-          </div>
-
-          {showNewProject && (
-            <div className="new-item-form">
-              <input
-                type="text"
-                placeholder="Nama project..."
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createProject()}
-              />
-              <div className="form-actions">
-                <button className="btn-secondary" onClick={() => setShowNewProject(false)}>
-                  Batal
-                </button>
-                <button className="btn-primary" onClick={createProject}>
-                  Buat
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="projects-list">
-            {projects.map(p => (
-              <div
-                key={p.id}
-                className={`project-item ${selectedProject?.id === p.id ? 'active' : ''}`}
-                onClick={() => setSelectedProject(p)}
-              >
-                <div>
-                  <strong>{p.name}</strong>
-                  <small>{new Date(p.created_at).toLocaleDateString('id-ID')}</small>
-                </div>
-                <button
-                  className="btn-delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteProject(p.id);
-                  }}
-                >
-                  🗑️
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* CONVERSATIONS */}
@@ -787,32 +716,11 @@ function App() {
             <h3>Percakapan</h3>
             <button
               className="btn-icon"
-              onClick={() => setShowNewConv(!showNewConv)}
-              disabled={!selectedProject}
+              onClick={createNewConversation}
             >
               +
             </button>
           </div>
-
-          {showNewConv && (
-            <div className="new-item-form">
-              <input
-                type="text"
-                placeholder="Judul percakapan..."
-                value={newConvTitle}
-                onChange={(e) => setNewConvTitle(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createConversation()}
-              />
-              <div className="form-actions">
-                <button className="btn-secondary" onClick={() => setShowNewConv(false)}>
-                  Batal
-                </button>
-                <button className="btn-primary" onClick={createConversation}>
-                  Buat
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="conversations-list">
             {conversations.map(c => (
@@ -845,22 +753,22 @@ function App() {
         {!selectedConv ? (
           <div className="empty-state">
             <h2>Selamat Datang di AI Code Assistant</h2>
-            <p>Pilih atau buat project dan percakapan untuk mulai</p>
+            <p>Buat percakapan baru untuk mulai chat dengan AI</p>
             <div className="features">
-              <div className="feature">
-                <span>📁</span>
-                <h3>Manajemen Project</h3>
-                <p>Atur kode Anda berdasarkan project</p>
-              </div>
               <div className="feature">
                 <span>💬</span>
                 <h3>AI Chat</h3>
-                <p>Dapatkan bantuan kode dari AI</p>
+                <p>Percakapan otomatis dinamai berdasarkan topik</p>
               </div>
               <div className="feature">
                 <span>📝</span>
-                <h3>Versioning File</h3>
-                <p>Lacak perubahan file otomatis</p>
+                <h3>File Management</h3>
+                <p>Kelola dan versioning file dengan AI</p>
+              </div>
+              <div className="feature">
+                <span>🚀</span>
+                <h3>GitHub Integration</h3>
+                <p>Import dan commit langsung ke repository</p>
               </div>
             </div>
           </div>
@@ -870,7 +778,7 @@ function App() {
             <div className="chat-header">
               <div>
                 <h2>{selectedConv.title}</h2>
-                <small>{selectedProject.name}</small>
+                <small>{new Date(selectedConv.created_at).toLocaleDateString('id-ID')}</small>
               </div>
             </div>
 
