@@ -35,6 +35,9 @@ def init_db():
         # Fix missing columns in chat table
         fix_chat_table_columns()
         
+        # Fix missing columns in draftversion table
+        fix_draftversion_table_columns()
+        
         logger.info("✅ Database initialization complete")
     except Exception as e:
         logger.error(f"❌ Failed to initialize database: {e}")
@@ -145,4 +148,33 @@ def fix_chat_table_columns():
             
     except Exception as e:
         logger.warning(f"⚠️ Could not auto-fix chat table columns: {e}")
+        # Don't raise - let the app continue, migrations might handle it
+
+def fix_draftversion_table_columns():
+    """Remove old columns from draftversion table"""
+    try:
+        with Session(engine) as session:
+            # Check if columns exist
+            result = session.exec(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'draftversion'
+            """))
+            
+            existing_columns = [row[0] for row in result]
+            
+            # Remove project_id column if it exists (old schema)
+            if 'project_id' in existing_columns:
+                logger.info("Removing project_id column from draftversion table (old schema)...")
+                session.exec(text("""
+                    ALTER TABLE draftversion 
+                    DROP COLUMN IF EXISTS project_id CASCADE
+                """))
+                session.commit()
+                logger.info("✅ Removed project_id column from draftversion")
+            
+            logger.info("✅ DraftVersion table columns verified/fixed")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Could not auto-fix draftversion table columns: {e}")
         # Don't raise - let the app continue, migrations might handle it
