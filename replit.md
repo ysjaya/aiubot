@@ -33,8 +33,8 @@ Preferred communication style: Simple, everyday language.
 - Modular service layer separating business logic from API routes
 
 **Core Components:**
-1. **API Layer** (`app/api/`): REST endpoints for projects, conversations, files, and GitHub integration.
-2. **Service Layer** (`app/services/`): Business logic for AI chain processing, GitHub import, and web tools.
+1. **API Layer** (`app/api/`): REST endpoints for conversations, chats, files, and GitHub integration.
+2. **Service Layer** (`app/services/`): Business logic for AI chain processing, GitHub import, web tools, and conversation auto-naming.
 3. **Database Layer** (`app/db/`): SQLModel models and database session management.
 4. **Core Config** (`app/core/`): Centralized settings using Pydantic.
 
@@ -47,15 +47,15 @@ Preferred communication style: Simple, everyday language.
 ### Data Models
 
 **Core Entities:**
-1. **Project**: Top-level container.
-2. **Conversation**: Chat threads within a project.
-3. **Chat**: Individual messages with user input and AI responses.
-4. **Attachment**: Files imported from GitHub or uploaded.
-5. **DraftVersion**: Captures AI-generated file revisions with metadata and completeness scores.
+1. **Conversation**: Main entity for organizing chats (standalone, no project hierarchy).
+2. **Chat**: Individual messages with user input and AI responses.
+3. **Attachment**: Files imported from GitHub or uploaded.
+4. **DraftVersion**: Captures AI-generated file revisions with metadata and completeness scores.
 
 **Relationships:**
-- One-to-many: Project → Conversations → Chats
+- One-to-many: Conversation → Chats
 - One-to-many: Conversation → Attachments
+- One-to-many: Conversation → DraftVersions
 - All relationships use SQLAlchemy cascade deletes.
 
 ### Authentication & Authorization
@@ -78,8 +78,9 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced GitHub Commit Workflow**: Only `LATEST` status files can be committed, with improved token fallback and pre-commit validation.
 - **Code Validator**: Detects incomplete functions, truncation markers, checks file structure, and validates minimum code length.
 - **GitHub Import**: Replaced file upload with GitHub repository import, supporting multiple files from any branch.
-- **Auto-Create Workflow**: Automatic project and conversation creation for streamlined onboarding.
-- **Deployment Configuration**: Autoscale deployment, build step for frontend, and `uvicorn` serving FastAPI with built React frontend.
+- **AI Auto-Naming**: Conversations are automatically named by AI based on the first message topic for better organization.
+- **Conversation-Only Model**: Removed project hierarchy - conversations are now standalone entities with direct file and chat associations.
+- **Deployment Configuration**: Autoscale deployment, build step for frontend, and `uvicorn` serving FastAPI with built React frontend on port 5000.
 
 ## External Dependencies
 
