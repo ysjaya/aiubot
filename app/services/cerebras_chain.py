@@ -472,7 +472,10 @@ async def promote_draft_to_attachment(
         
         logger.info(f"[PROMOTE] Promoting draft {draft.filename} v{draft.version_number} to LATEST...")
         
-        # Mark old LATEST as MODIFIED
+        # Find the parent file (either LATEST or ORIGINAL)
+        parent_file = None
+        
+        # First, check if there's a LATEST file
         old_latest = session.exec(
             select(models.Attachment)
             .where(models.Attachment.conversation_id == draft.conversation_id)
@@ -481,8 +484,23 @@ async def promote_draft_to_attachment(
         ).first()
         
         if old_latest:
+            # Mark old LATEST as MODIFIED
             old_latest.status = models.FileStatus.MODIFIED
             session.add(old_latest)
+            parent_file = old_latest
+            logger.info(f"[PROMOTE] Found LATEST file, marking as MODIFIED")
+        else:
+            # If no LATEST, find ORIGINAL file to use as parent
+            original_file = session.exec(
+                select(models.Attachment)
+                .where(models.Attachment.conversation_id == draft.conversation_id)
+                .where(models.Attachment.filename == draft.filename)
+                .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+            ).first()
+            
+            if original_file:
+                parent_file = original_file
+                logger.info(f"[PROMOTE] Using ORIGINAL file as parent")
         
         # Determine version number for new Attachment
         all_attachments = session.exec(
@@ -497,7 +515,7 @@ async def promote_draft_to_attachment(
         new_att = models.Attachment(
             conversation_id=draft.conversation_id,
             filename=draft.filename,
-            original_filename=draft.original_filename,
+            original_filename=draft.original_filename or draft.filename,
             file_path=draft.filename,
             content=draft.content,
             content_hash=draft.content_hash,
@@ -505,7 +523,7 @@ async def promote_draft_to_attachment(
             size_bytes=draft.content_length,
             status=models.FileStatus.LATEST,
             version=next_att_version,
-            parent_file_id=old_latest.id if old_latest else None,
+            parent_file_id=parent_file.id if parent_file else None,
             modification_summary=draft.change_summary,
             import_source="ai_draft",
             import_metadata=json.dumps({
