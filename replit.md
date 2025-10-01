@@ -17,8 +17,9 @@ This project is a full-stack AI coding assistant built with FastAPI and React, p
     - `fix_conversation_table_columns()`: Removes `project_id` column, adds `updated_at` column
     - `fix_attachment_table_columns()`: Adds `file_path` column if missing
     - `fix_chat_table_columns()`: Adds `context_file_ids` and `files_modified` columns
+    - `fix_draftversion_table_columns()`: Removes `project_id` column from draftversion table
   - Prevents multiple production errors:
-    - "null value in column project_id violates not-null constraint"
+    - "null value in column project_id violates not-null constraint" (conversation & draftversion)
     - "column conversation.updated_at does not exist"
     - "column file_path of relation attachment does not exist"
   - All migrations run automatically on app startup
