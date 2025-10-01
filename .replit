@@ -17,19 +17,19 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Frontend"
+args = "Dev Server"
 
 [[workflows.workflow]]
-name = "Frontend"
+name = "Dev Server"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash -c \"python -m uvicorn main:app --host localhost --port 8000 --reload & sleep 3 && cd frontend && npm run dev\""
+args = "uvicorn main:app --host localhost --port 8000 --reload & cd frontend && npm run dev"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000
