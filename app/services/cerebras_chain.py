@@ -511,6 +511,22 @@ async def promote_draft_to_attachment(
         
         next_att_version = max([a.version for a in all_attachments], default=0) + 1
         
+        # Preserve origin information if editing an existing file
+        if parent_file and parent_file.import_source and parent_file.import_source != "ai_draft":
+            # Editing a file with an original source (e.g., GitHub import) - preserve it
+            import_source = parent_file.import_source
+            import_metadata = parent_file.import_metadata
+            logger.info(f"[PROMOTE] Preserving origin: {import_source}")
+        else:
+            # New AI-generated file or editing a previous AI draft
+            import_source = "ai_draft"
+            import_metadata = json.dumps({
+                "draft_id": draft.id,
+                "draft_version": draft.version_number,
+                "promoted_at": datetime.utcnow().isoformat()
+            })
+            logger.info(f"[PROMOTE] New AI file, setting origin to ai_draft")
+        
         # Create new LATEST Attachment
         new_att = models.Attachment(
             conversation_id=draft.conversation_id,
@@ -525,12 +541,8 @@ async def promote_draft_to_attachment(
             version=next_att_version,
             parent_file_id=parent_file.id if parent_file else None,
             modification_summary=draft.change_summary,
-            import_source="ai_draft",
-            import_metadata=json.dumps({
-                "draft_id": draft.id,
-                "draft_version": draft.version_number,
-                "promoted_at": datetime.utcnow().isoformat()
-            })
+            import_source=import_source,
+            import_metadata=import_metadata
         )
         
         session.add(new_att)
