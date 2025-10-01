@@ -753,16 +753,22 @@ async def ai_chain_stream(messages, conv_id: int, unlimited: bool = True):
                             )
                             
                             if new_version:
-                                updated_files.append(new_version)
+                                # Extract data while still in session to avoid DetachedInstanceError
+                                updated_files.append({
+                                    'id': new_version.id,
+                                    'filename': new_version.filename,
+                                    'version': new_version.version,
+                                    'modification_summary': new_version.modification_summary or ''
+                                })
                 
                 if updated_files:
                     update_notification = "\n\n---\n### ✨ Files Updated:\n\n"
                     for file in updated_files:
-                        update_notification += f"- **{file.filename}** (v{file.version}) - {file.modification_summary}\n"
+                        update_notification += f"- **{file['filename']}** (v{file['version']}) - {file['modification_summary']}\n"
                     update_notification += "\n_Semua file di atas adalah LENGKAP 100% dan siap untuk di-commit._\n"
                     
                     yield update_notification
-                    modified_ids = [f.id for f in updated_files]
+                    modified_ids = [f['id'] for f in updated_files]
                 else:
                     modified_ids = []
                     yield "\n\n_⚠️ Catatan: Beberapa draft dibuat tapi tidak lengkap. Periksa draft untuk review manual._\n"
