@@ -4,6 +4,28 @@
 
 This project is a full-stack AI coding assistant built with FastAPI and React, providing a chat interface for AI-powered code assistance. It includes file management, versioning, and GitHub integration. The system leverages Cerebras and NVIDIA AI models for code generation and understanding, with SQLModel/PostgreSQL for data persistence. The project's vision is to streamline the development workflow by offering an intelligent assistant that handles code generation, manages file changes, and integrates seamlessly with version control systems, thereby boosting developer productivity and accelerating project delivery.
 
+## Recent Changes
+
+**Date: October 1, 2025**
+- **Replit Environment Setup**: Configured project to run in Replit environment
+  - Installed Python 3.11 and Node.js 20
+  - Installed all Python dependencies from requirements.txt
+  - Installed frontend dependencies (npm install)
+  - Created PostgreSQL database for development
+- **Database Schema Fix**: Added automatic migration for missing `updated_at` column in conversation table
+  - Added `fix_conversation_table_columns()` function in `app/db/database.py`
+  - Function checks for and adds missing columns during initialization
+  - Prevents "column conversation.updated_at does not exist" error in production
+- **Workflow Configuration**: Setup development workflow
+  - Backend runs on localhost:8000
+  - Frontend runs on 0.0.0.0:5000 with Vite dev server
+  - Frontend proxies API requests to backend
+  - Single workflow starts both backend and frontend
+- **Deployment Configuration**: Setup autoscale deployment
+  - Build step: `cd frontend && npm run build`
+  - Run command: uvicorn serving FastAPI with built React frontend on port 5000
+  - Deployment type: autoscale (stateless web application)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
