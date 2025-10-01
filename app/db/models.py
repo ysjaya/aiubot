@@ -17,27 +17,31 @@ class DraftStatus(str, Enum):
     REJECTED = "rejected"      # Draft ditolak
     PROMOTED = "promoted"      # Draft sudah dipromosikan jadi LATEST
 
-class Project(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    conversations: List["Conversation"] = Relationship(back_populates="project")
-
 class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: int = Field(foreign_key="project.id")
-    title: str
+    title: str = Field(default="New Conversation")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    project: Optional[Project] = Relationship(back_populates="conversations")
-    chats: List["Chat"] = Relationship(back_populates="conversation")
-    attachments: List["Attachment"] = Relationship(back_populates="conversation")
-    drafts: List["DraftVersion"] = Relationship(back_populates="conversation")
+    # Relationships with cascade delete
+    chats: List["Chat"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    attachments: List["Attachment"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    drafts: List["DraftVersion"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    conversation_id: int = Field(foreign_key="conversation.id")
+    conversation_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE"))
+    )
     user: str
     message: str = Field(sa_column=Column(Text))
     ai_response: str = Field(sa_column=Column(Text))
@@ -50,8 +54,9 @@ class Chat(SQLModel, table=True):
 class Attachment(SQLModel, table=True):
     """File yang sudah di-approve dan siap digunakan AI atau di-commit"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    conversation_id: int = Field(foreign_key="conversation.id")
-    project_id: int = Field(foreign_key="project.id")
+    conversation_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE"))
+    )
     
     # File info
     filename: str
@@ -102,8 +107,9 @@ class Attachment(SQLModel, table=True):
 class DraftVersion(SQLModel, table=True):
     """Draft file yang dihasilkan AI sebelum di-approve"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    conversation_id: int = Field(foreign_key="conversation.id")
-    project_id: int = Field(foreign_key="project.id")
+    conversation_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE"))
+    )
     
     # File reference
     filename: str = Field(index=True)

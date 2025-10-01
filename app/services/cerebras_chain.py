@@ -256,6 +256,38 @@ def stream_cerebras_unlimited(messages: List[Dict], max_total_tokens: int = 1000
         logger.warning(f"[UNLIMITED] Reached total token limit ({max_total_tokens})")
         yield "\n\n_[Output limit reached - maximum total tokens generated]_"
 
+async def generate_conversation_title(first_message: str) -> str:
+    """Generate conversation title based on first message using AI"""
+    if not cerebras_client:
+        logger.warning("Cerebras client not available, using default title")
+        return "New Conversation"
+    
+    try:
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that generates short, concise conversation titles. Generate a title that is 2-5 words, descriptive, and captures the main topic. Respond ONLY with the title, nothing else."
+            },
+            {
+                "role": "user",
+                "content": f"Generate a short conversation title (2-5 words) for this message:\n\n{first_message[:200]}"
+            }
+        ]
+        
+        title = await call_cerebras(messages)
+        title = title.strip().strip('"').strip("'")
+        
+        # Limit length
+        if len(title) > 50:
+            title = title[:50].strip()
+        
+        logger.info(f"[AI TITLE] Generated title: {title}")
+        return title
+        
+    except Exception as e:
+        logger.error(f"[AI TITLE] Failed to generate title: {e}")
+        return "New Conversation"
+
 async def get_conversation_context(conv_id: int):
     """Get conversation context including files and chat history"""
     with next(get_session()) as session:
@@ -334,7 +366,6 @@ def detect_code_blocks_with_filenames(response: str) -> List[Dict]:
 
 async def save_to_draft_with_validation(
     conversation_id: int,
-    project_id: int,
     filename: str,
     content: str,
     attachment_id: Optional[int],
@@ -367,7 +398,6 @@ async def save_to_draft_with_validation(
         # Compute hash and length
         content_hash = models.DraftVersion.compute_hash(models.DraftVersion(
             conversation_id=conversation_id,
-            project_id=project_id,
             filename=filename,
             content=content,
             content_hash="",
@@ -386,7 +416,6 @@ async def save_to_draft_with_validation(
         # Create draft
         draft = models.DraftVersion(
             conversation_id=conversation_id,
-            project_id=project_id,
             filename=filename,
             original_filename=filename,
             attachment_id=attachment_id,
@@ -458,7 +487,6 @@ async def promote_draft_to_attachment(
         # Create new LATEST Attachment
         new_att = models.Attachment(
             conversation_id=draft.conversation_id,
-            project_id=draft.project_id,
             filename=draft.filename,
             original_filename=draft.original_filename,
             file_path=draft.filename,
@@ -545,7 +573,6 @@ async def intelligent_file_update(
             # Save to draft with validation
             draft = await save_to_draft_with_validation(
                 conversation_id=attachment.conversation_id,
-                project_id=attachment.project_id,
                 filename=attachment.filename,
                 content=new_content,
                 attachment_id=attachment.id,
@@ -579,7 +606,7 @@ async def intelligent_file_update(
 
 # ==================== MAIN AI CHAIN ====================
 
-async def ai_chain_stream(messages, project_id: int, conv_id: int, unlimited: bool = True):
+async def ai_chain_stream(messages, conv_id: int, unlimited: bool = True):
     """
     Enhanced AI chain with intelligent file analysis, draft system, and completeness validation
     """

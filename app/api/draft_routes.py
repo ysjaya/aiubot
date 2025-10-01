@@ -16,7 +16,6 @@ router = APIRouter()
 @router.get("/drafts")
 async def list_drafts(
     conversation_id: int,
-    project_id: int,
     session: Session = Depends(get_session)
 ):
     """List all drafts for a conversation"""
@@ -24,7 +23,6 @@ async def list_drafts(
         drafts = session.exec(
             select(models.DraftVersion)
             .where(models.DraftVersion.conversation_id == conversation_id)
-            .where(models.DraftVersion.project_id == project_id)
             .order_by(models.DraftVersion.created_at.desc())
         ).all()
         
@@ -192,7 +190,6 @@ async def promote_draft(
 @router.get("/drafts/pending")
 async def list_pending_drafts(
     conversation_id: int,
-    project_id: int,
     session: Session = Depends(get_session)
 ):
     """List all pending drafts awaiting review"""
@@ -200,7 +197,6 @@ async def list_pending_drafts(
         drafts = session.exec(
             select(models.DraftVersion)
             .where(models.DraftVersion.conversation_id == conversation_id)
-            .where(models.DraftVersion.project_id == project_id)
             .where(models.DraftVersion.status == models.DraftStatus.PENDING)
             .order_by(models.DraftVersion.created_at.desc())
         ).all()

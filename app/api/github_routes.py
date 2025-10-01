@@ -18,7 +18,6 @@ class GitHubImportRequest(BaseModel):
     repo_fullname: str
     file_paths: List[str]
     conversation_id: int
-    project_id: int
 
 class GitHubRepoListRequest(BaseModel):
     pass
@@ -26,7 +25,6 @@ class GitHubRepoListRequest(BaseModel):
 class GitHubCommitRequest(BaseModel):
     repo_fullname: str
     conversation_id: int
-    project_id: int
     branch: str = "main"
     commit_message: Optional[str] = None
     base_path: Optional[str] = ""
@@ -80,11 +78,6 @@ async def import_files_from_github(
     session: Session = Depends(get_session)
 ):
     """Import selected files from GitHub repository"""
-    
-    # Verify project exists
-    project = session.get(models.Project, request.project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
     
     # Verify conversation exists
     conv = session.get(models.Conversation, request.conversation_id)

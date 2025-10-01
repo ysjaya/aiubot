@@ -21,7 +21,6 @@ class ChatRequest(BaseModel):
 
 async def stream_chat_response(
     message: str,
-    project_id: int,
     conv_id: int,
     unlimited: bool = True
 ) -> AsyncGenerator[str, None]:
@@ -35,7 +34,6 @@ async def stream_chat_response(
         
         async for chunk in ai_chain_stream(
             messages,
-            project_id,
             conv_id,
             unlimited=unlimited
         ):
@@ -54,7 +52,6 @@ async def stream_chat_response(
 async def chat(
     conv_id: int,
     request: ChatRequest,
-    project_id: int,
     session: Session = Depends(get_session)
 ):
     """Send message and get AI response (streaming)"""
@@ -69,7 +66,6 @@ async def chat(
     return StreamingResponse(
         stream_chat_response(
             request.message,
-            project_id,
             conv_id,
             unlimited=request.unlimited
         ),
@@ -86,13 +82,12 @@ async def chat(
 @router.websocket("/ws/ai")
 async def websocket_chat(
     websocket: WebSocket,
-    project_id: int,
     conversation_id: int
 ):
     """WebSocket endpoint for real-time AI chat"""
     
     await websocket.accept()
-    logger.info(f"[WebSocket] Connected: project={project_id}, conv={conversation_id}")
+    logger.info(f"[WebSocket] Connected: conv={conversation_id}")
     
     try:
         # Wait for message from client
@@ -127,7 +122,7 @@ async def websocket_chat(
             {"role": "user", "content": user_message}
         ]
         
-        async for chunk in ai_chain_stream(messages, project_id, conversation_id):
+        async for chunk in ai_chain_stream(messages, conversation_id):
             if isinstance(chunk, str):
                 # Text chunk - send as is
                 await websocket.send_text(chunk)

@@ -45,80 +45,61 @@ async def get_github_token(authorization: Optional[str] = Header(None)):
         detail="GitHub not connected. Please connect GitHub in the integrations panel."
     )
 
-# ==================== PROJECT MANAGEMENT ====================
-
-@router.post("/project", response_model=models.Project)
-def create_project(name: str, session: Session = Depends(get_session)):
-    """Membuat proyek baru"""
-    if not name or not name.strip():
-        raise HTTPException(status_code=400, detail="Project name is required")
-    
-    project = models.Project(name=name.strip())
-    session.add(project)
-    session.commit()
-    session.refresh(project)
-    
-    logger.info(f"Created project: {project.id} - {project.name}")
-    return project
-
-@router.get("/projects", response_model=List[models.Project])
-def list_projects(session: Session = Depends(get_session)):
-    """Menampilkan semua proyek"""
-    projects = session.exec(
-        select(models.Project).order_by(models.Project.created_at.desc())
-    ).all()
-    return projects
-
-@router.delete("/project/{project_id}")
-def delete_project(project_id: int, session: Session = Depends(get_session)):
-    """Menghapus proyek beserta semua data terkait"""
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    session.delete(project)
-    session.commit()
-    
-    logger.info(f"Deleted project: {project_id}")
-    return {"ok": True, "message": "Project and its data deleted"}
-
 # ==================== CONVERSATION MANAGEMENT ====================
+
+class ConversationCreate(BaseModel):
+    title: Optional[str] = None
+    first_message: Optional[str] = None
+
+class ConversationNameRequest(BaseModel):
+    message: str
 
 @router.post("/conversation", response_model=models.Conversation)
 def new_conversation(
-    project_id: int, 
-    title: str, 
+    request: ConversationCreate,
     session: Session = Depends(get_session)
 ):
-    """Membuat percakapan baru dalam sebuah proyek"""
-    if not title or not title.strip():
-        raise HTTPException(status_code=400, detail="Conversation title is required")
+    """Membuat percakapan baru dengan judul default atau custom"""
+    title = request.title if request.title and request.title.strip() else "New Conversation"
     
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    conv = models.Conversation(project_id=project_id, title=title.strip())
+    conv = models.Conversation(title=title.strip())
     session.add(conv)
     session.commit()
     session.refresh(conv)
+    
     logger.info(f"Created conversation: {conv.id} - {conv.title}")
     return conv
 
-@router.get("/project/{project_id}/conversations", response_model=List[models.Conversation])
-def list_conversations(
-    project_id: int, 
+@router.post("/conversation/auto-name")
+async def generate_conversation_name(
+    request: ConversationNameRequest,
     session: Session = Depends(get_session)
 ):
-    """Menampilkan semua percakapan dalam sebuah proyek"""
-    project = session.get(models.Project, project_id)
-    if not project:
-        return []
-    
+    """Generate conversation name using AI based on first message"""
+    try:
+        from app.services.cerebras_chain import generate_conversation_title
+        
+        # Generate title using AI
+        title = await generate_conversation_title(request.message)
+        
+        return {
+            "success": True,
+            "title": title
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate conversation title: {e}")
+        # Fallback to default title
+        return {
+            "success": False,
+            "title": "New Conversation",
+            "error": str(e)
+        }
+
+@router.get("/conversations", response_model=List[models.Conversation])
+def list_conversations(session: Session = Depends(get_session)):
+    """Menampilkan semua percakapan"""
     conversations = session.exec(
-        select(models.Conversation)
-        .where(models.Conversation.project_id == project_id)
-        .order_by(models.Conversation.created_at.desc())
+        select(models.Conversation).order_by(models.Conversation.updated_at.desc())
     ).all()
     return conversations
 
@@ -127,15 +108,40 @@ def delete_conversation(
     conv_id: int,
     session: Session = Depends(get_session)
 ):
-    """Menghapus sebuah percakapan"""
+    """Menghapus sebuah percakapan beserta semua data terkait (cascade delete)"""
     conv = session.get(models.Conversation, conv_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
+    # Cascade delete akan otomatis menghapus:
+    # - Semua Chat
+    # - Semua Attachment
+    # - Semua DraftVersion
     session.delete(conv)
     session.commit()
-    logger.info(f"Deleted conversation: {conv_id}")
-    return {"ok": True}
+    
+    logger.info(f"Deleted conversation and all related data: {conv_id}")
+    return {"ok": True, "message": "Conversation and all related data deleted"}
+
+@router.patch("/conversation/{conv_id}")
+def update_conversation(
+    conv_id: int,
+    title: str,
+    session: Session = Depends(get_session)
+):
+    """Update conversation title"""
+    conv = session.get(models.Conversation, conv_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    conv.title = title.strip()
+    conv.updated_at = datetime.utcnow()
+    session.add(conv)
+    session.commit()
+    session.refresh(conv)
+    
+    logger.info(f"Updated conversation {conv_id} title to: {title}")
+    return conv
 
 @router.get("/conversation/{conv_id}/chats", response_model=List[models.Chat])
 def get_chats(
