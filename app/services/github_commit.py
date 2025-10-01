@@ -86,6 +86,7 @@ def commit_all_files(
 
         # Kumpulkan file yang akan di-commit
         tree_elements = []
+        file_info = []  # Store file info for response
         for att in attachments:
             filename = att.original_filename or att.filename
             file_path = f"{base_path}/{filename}".lstrip("/")
@@ -105,6 +106,7 @@ def commit_all_files(
                     content=content
                 )
                 tree_elements.append(element)
+                file_info.append({'path': file_path, 'size': len(content)})
                 logger.info(f"[GITHUB COMMIT] ✅ Menambahkan file ke commit: {file_path} ({len(content)} chars)")
 
             except Exception as e:
@@ -146,7 +148,7 @@ def commit_all_files(
                 "commit_url": f"https://github.com/{repo_fullname}/commit/{commit.sha}",
                 "message": commit_message,
                 "file_count": len(tree_elements),
-                "files": [f"{el.path} ({len(el.content)} chars)" for el in tree_elements]
+                "files": [f"{info['path']} ({info['size']} chars)" for info in file_info]
             }
             
         except GithubException as e:
