@@ -190,16 +190,15 @@ async def import_all_from_repo(
     owner: str,
     repo: str,
     conversation_id: int,
-    project_id: int,
     github_token: str = Depends(get_github_token),
     session: Session = Depends(get_session)
 ):
     """Import all valid files from a repository (quick import)"""
     
-    # Verify project
-    project = session.get(models.Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    # Verify conversation exists
+    conv = session.get(models.Conversation, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     
     try:
         repo_fullname = f"{owner}/{repo}"
@@ -253,11 +252,6 @@ async def commit_all_conversation_files(
     session: Session = Depends(get_session)
 ):
     """Commit all LATEST files from a conversation to GitHub repository"""
-    
-    # Verify project
-    project = session.get(models.Project, request.project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
     
     # Verify conversation
     conv = session.get(models.Conversation, request.conversation_id)

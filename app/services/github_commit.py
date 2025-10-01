@@ -39,8 +39,8 @@ def commit_all_files(
     conversation_id: int,
     session: Session,
     branch: str = "main",
-    commit_message: str = None,
-    base_path: str = ""
+    commit_message: Optional[str] = None,
+    base_path: Optional[str] = ""
 ) -> Dict:
     """
     Commit semua file LATEST dari percakapan ke GitHub.
