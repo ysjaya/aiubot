@@ -291,13 +291,22 @@ async def generate_conversation_title(first_message: str) -> str:
 async def get_conversation_context(conv_id: int):
     """Get conversation context including files and chat history"""
     with next(get_session()) as session:
-        # Get attachments with LATEST status
+        # Get attachments with LATEST status first
         attachments = session.exec(
             select(models.Attachment)
             .where(models.Attachment.conversation_id == conv_id)
             .where(models.Attachment.status == models.FileStatus.LATEST)
             .order_by(models.Attachment.updated_at.desc())
         ).all()
+        
+        # If no LATEST files, get ORIGINAL files
+        if not attachments:
+            attachments = session.exec(
+                select(models.Attachment)
+                .where(models.Attachment.conversation_id == conv_id)
+                .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+                .order_by(models.Attachment.created_at.desc())
+            ).all()
         
         # Build file context
         file_context = ""
