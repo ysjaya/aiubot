@@ -38,7 +38,7 @@ def init_db():
         raise
 
 def fix_conversation_table_columns():
-    """Add missing columns to conversation table if they don't exist"""
+    """Add missing columns and remove old columns from conversation table"""
     try:
         with Session(engine) as session:
             # Check if columns exist
@@ -49,6 +49,16 @@ def fix_conversation_table_columns():
             """))
             
             existing_columns = [row[0] for row in result]
+            
+            # Remove project_id column if it exists (old schema)
+            if 'project_id' in existing_columns:
+                logger.info("Removing project_id column from conversation table (old schema)...")
+                session.exec(text("""
+                    ALTER TABLE conversation 
+                    DROP COLUMN IF EXISTS project_id CASCADE
+                """))
+                session.commit()
+                logger.info("✅ Removed project_id column")
             
             # Add updated_at if missing
             if 'updated_at' not in existing_columns:
