@@ -29,6 +29,9 @@ def init_db():
         # Fix missing columns in conversation table
         fix_conversation_table_columns()
         
+        # Fix missing columns in attachment table
+        fix_attachment_table_columns()
+        
         # Fix missing columns in chat table
         fix_chat_table_columns()
         
@@ -74,6 +77,35 @@ def fix_conversation_table_columns():
             
     except Exception as e:
         logger.warning(f"⚠️ Could not auto-fix conversation table columns: {e}")
+        # Don't raise - let the app continue, migrations might handle it
+
+def fix_attachment_table_columns():
+    """Add missing columns to attachment table if they don't exist"""
+    try:
+        with Session(engine) as session:
+            # Check if columns exist
+            result = session.exec(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'attachment'
+            """))
+            
+            existing_columns = [row[0] for row in result]
+            
+            # Add file_path if missing
+            if 'file_path' not in existing_columns:
+                logger.info("Adding file_path column to attachment table...")
+                session.exec(text("""
+                    ALTER TABLE attachment 
+                    ADD COLUMN file_path VARCHAR DEFAULT ''
+                """))
+                session.commit()
+                logger.info("✅ Added file_path column")
+            
+            logger.info("✅ Attachment table columns verified/fixed")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Could not auto-fix attachment table columns: {e}")
         # Don't raise - let the app continue, migrations might handle it
 
 def fix_chat_table_columns():

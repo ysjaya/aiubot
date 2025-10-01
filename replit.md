@@ -13,12 +13,15 @@ This project is a full-stack AI coding assistant built with FastAPI and React, p
   - Installed frontend dependencies (npm install)
   - Created PostgreSQL database for development
 - **Database Schema Migration**: Fixed schema incompatibility between old and new code
-  - Added `fix_conversation_table_columns()` function in `app/db/database.py`
-  - Automatically removes `project_id` column from old schema (project hierarchy removed)
-  - Automatically adds missing `updated_at` column if not present
-  - Prevents "null value in column project_id violates not-null constraint" error
-  - Prevents "column conversation.updated_at does not exist" error
-  - Migration runs automatically on app startup
+  - Added migration functions in `app/db/database.py`:
+    - `fix_conversation_table_columns()`: Removes `project_id` column, adds `updated_at` column
+    - `fix_attachment_table_columns()`: Adds `file_path` column if missing
+    - `fix_chat_table_columns()`: Adds `context_file_ids` and `files_modified` columns
+  - Prevents multiple production errors:
+    - "null value in column project_id violates not-null constraint"
+    - "column conversation.updated_at does not exist"
+    - "column file_path of relation attachment does not exist"
+  - All migrations run automatically on app startup
 - **Workflow Configuration**: Setup development workflow
   - Backend runs on localhost:8000
   - Frontend runs on 0.0.0.0:5000 with Vite dev server
