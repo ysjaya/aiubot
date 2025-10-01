@@ -23,21 +23,17 @@ args = "Frontend"
 name = "Frontend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash -c \"python -m uvicorn main:app --host localhost --port 8000 --reload & cd frontend && npm run dev\""
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && npm run dev"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 42097
-externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
