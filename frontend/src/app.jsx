@@ -636,7 +636,14 @@ function App() {
       });
 
       if (!res.ok) {
-        throw new Error('Commit failed');
+        let errorMessage = 'Commit failed';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();
@@ -653,7 +660,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to commit files:', err);
-      alert('Gagal commit file: ' + err.message);
+      alert('❌ Gagal commit file:\n\n' + err.message);
     } finally {
       setCommitting(false);
     }
