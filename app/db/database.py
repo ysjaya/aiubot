@@ -124,6 +124,16 @@ def fix_chat_table_columns():
             
             existing_columns = [row[0] for row in result]
             
+            # Add response_received_at if missing
+            if 'response_received_at' not in existing_columns:
+                logger.info("Adding response_received_at column to chat table...")
+                session.exec(text("""
+                    ALTER TABLE chat 
+                    ADD COLUMN response_received_at TIMESTAMP NULL
+                """))
+                session.commit()
+                logger.info("✅ Added response_received_at column")
+            
             # Add context_file_ids if missing
             if 'context_file_ids' not in existing_columns:
                 logger.info("Adding context_file_ids column to chat table...")

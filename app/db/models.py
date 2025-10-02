@@ -46,6 +46,7 @@ class Chat(SQLModel, table=True):
     message: str = Field(sa_column=Column(Text))
     ai_response: str = Field(sa_column=Column(Text))
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    response_received_at: Optional[datetime] = None
     context_file_ids: Optional[str] = None
     files_modified: Optional[str] = None
     
