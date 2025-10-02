@@ -614,51 +614,51 @@ class WebSearchHandler(BaseTaskHandler):
     def __init__(self, ai_client: AIClientManager, deep_search: DeepWebSearch):
         super().__init__(ai_client, deep_search)
         self.task_type = TaskType.WEB_SEARCH
-    
+
     async def process(self, task: Task, session: Session) -> AIResponse:
-        start_time = datetime.utcnow()
-        
-        # Perform deep search
-        search_results = await self.deep_search(task.content, depth=2)
-        
-        # Format results for AI processing
-        formatted_results = []
-        for i, result in enumerate(search_results[:5]):  # Top 5 results
-            formatted_results.append(f"""[{i+1}] {result.title}
+    start_time = datetime.utcnow()
+    
+    # Perform deep search - FIX: Call the method, not the object
+    search_results = await self.deep_search.deep_search(task.content, depth=2)
+    
+    # Format results for AI processing
+    formatted_results = []
+    for i, result in enumerate(search_results[:5]):  # Top 5 results
+        formatted_results.append(f"""[{i+1}] {result.title}
 URL: {result.url}
 Relevance: {result.relevance_score:.2f}
 Snippet: {result.snippet}
 {'Content: ' + result.content_preview if result.content_preview else ''}""")
-        
-        results_text = "\n\n".join(formatted_results)
-        
-        # Ask AI to synthesize information
-        system_prompt = """You are a research assistant that synthesizes information from multiple sources.
+    
+    results_text = "\n\n".join(formatted_results)
+    
+    # Ask AI to synthesize information
+    system_prompt = """You are a research assistant that synthesizes information from multiple sources.
 Analyze the search results and provide a comprehensive, well-organized answer.
 Cite sources using [1], [2], etc. notation.
 Focus on accuracy and relevance."""
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Based on these search results, answer the question:\n\n{task.content}\n\nSEARCH RESULTS:\n{results_text}"}
-        ]
-        
-        ai_result = await self.ai_client.call_best_available(messages, "", 2048, 0.5)
-        
-        if not ai_result:
-            raise Exception("AI call failed")
-        
-        processing_time = (datetime.utcnow() - start_time).total_seconds()
-        
-        return AIResponse(
-            content=ai_result['content'],
-            task_id=task.id,
-            model_used=ai_result['model'],
-            processing_time=processing_time,
-            tokens_used=ai_result['usage']['total_tokens'],
-            confidence_score=0.8,
-            sources=search_results[:5]
-        )
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Based on these search results, answer the question:\n\n{task.content}\n\nSEARCH RESULTS:\n{results_text}"}
+    ]
+    
+    ai_result = await self.ai_client.call_best_available(messages, "", 2048, 0.5)
+    
+    if not ai_result:
+        raise Exception("AI call failed")
+    
+    processing_time = (datetime.utcnow() - start_time).total_seconds()
+    
+    return AIResponse(
+        content=ai_result['content'],
+        task_id=task.id,
+        model_used=ai_result['model'],
+        processing_time=processing_time,
+        tokens_used=ai_result['usage']['total_tokens'],
+        confidence_score=0.8,
+        sources=search_results[:5]
+    )
 
 class ArchitectureHandler(BaseTaskHandler):
     """Handles architecture design tasks"""
