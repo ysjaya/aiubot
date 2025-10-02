@@ -120,6 +120,7 @@ async def chat(
     new_chat = models.Chat(
         conversation_id=conv_id,
         user=request.message.strip(),
+        message=request.message.strip(),  # Set message field as well
         ai_response="",  # Will be filled during streaming
         created_at=datetime.utcnow()
     )
@@ -190,6 +191,7 @@ async def websocket_chat(
             new_chat = models.Chat(
                 conversation_id=conversation_id,
                 user=user_message.strip(),
+                message=user_message.strip(),  # Set message field as well
                 ai_response="",
                 created_at=datetime.utcnow()
             )
