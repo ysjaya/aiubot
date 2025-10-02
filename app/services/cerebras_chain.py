@@ -1157,6 +1157,63 @@ async def ai_chain_stream(
         }
         yield f"data: {json.dumps(error_data)}\n\n"
 
+async def generate_conversation_title(messages: List[Dict], conversation_id: int) -> str:
+    """
+    Generate a concise title for a conversation based on the messages
+    """
+    try:
+        # Get the first user message
+        first_user_message = ""
+        for msg in messages:
+            if msg["role"] == "user":
+                first_user_message = msg["content"]
+                break
+        
+        if not first_user_message:
+            return "New Conversation"
+        
+        # Truncate if too long
+        if len(first_user_message) > 200:
+            first_user_message = first_user_message[:200] + "..."
+        
+        # Ask AI to generate a short title
+        system_prompt = """Generate a short, descriptive title (3-6 words) for this conversation.
+The title should capture the main topic or question.
+Return ONLY the title, nothing else."""
+        
+        messages_for_title = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Generate a title for this conversation:\n\n{first_user_message}"}
+        ]
+        
+        # Get AI client
+        router = get_task_router()
+        
+        # Call AI with short response
+        ai_result = await router.ai_client.call_best_available(
+            messages_for_title, 
+            "", 
+            max_tokens=50, 
+            temperature=0.7
+        )
+        
+        if ai_result and ai_result['content']:
+            title = ai_result['content'].strip()
+            # Remove quotes if present
+            title = title.strip('"\'')
+            # Limit length
+            if len(title) > 50:
+                title = title[:47] + "..."
+            return title
+        
+        # Fallback: Use first few words of user message
+        words = first_user_message.split()[:5]
+        return " ".join(words) + ("..." if len(words) == 5 else "")
+        
+    except Exception as e:
+        logger.error(f"Error generating conversation title: {e}")
+        return "New Conversation"
+
 async def ai_chain_simple(
     messages: List[Dict],
     conversation_id: int,
