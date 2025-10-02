@@ -502,22 +502,45 @@ class CodeGenerationHandler(BaseTaskHandler):
         self.task_type = TaskType.CODE_GENERATION
     
     async def _get_project_files(self, session: Session, conversation_id: int) -> str:
-        """Get project files context"""
+        """Get project files context - reads LATEST files, falls back to ORIGINAL if no LATEST exist"""
         try:
+            # Try to get LATEST files first
             attachments = session.exec(
                 select(models.Attachment)
                 .where(models.Attachment.conversation_id == conversation_id)
                 .where(models.Attachment.status == models.FileStatus.LATEST)
+                .order_by(models.Attachment.updated_at.desc())
             ).all()
             
-            files_context = "PROJECT FILES:\n"
-            for att in attachments:
-                files_context += f"\n--- {att.filename} ---\n"
-                if att.content and len(att.content) < 5000:  # Limit content size
-                    files_context += att.content
-                else:
-                    files_context += "(Content too long to display)"
+            # If no LATEST files, fall back to ORIGINAL (for fresh GitHub imports)
+            if not attachments:
+                logger.info(f"No LATEST files found, falling back to ORIGINAL files for conversation {conversation_id}")
+                attachments = session.exec(
+                    select(models.Attachment)
+                    .where(models.Attachment.conversation_id == conversation_id)
+                    .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+                    .order_by(models.Attachment.created_at.desc())
+                ).all()
             
+            if not attachments:
+                logger.warning(f"No files found for conversation {conversation_id}")
+                return "PROJECT FILES: No files attached yet."
+            
+            files_context = f"PROJECT FILES ({len(attachments)} files):\n"
+            for att in attachments:
+                files_context += f"\n--- {att.filename} ({att.get_display_status()}) ---\n"
+                if att.content:
+                    # Limit individual file size to 5000 chars for performance
+                    if len(att.content) < 5000:
+                        files_context += att.content
+                    else:
+                        # Show first 2500 chars for large files
+                        files_context += att.content[:2500]
+                        files_context += f"\n\n... (file truncated, showing first 2500 of {len(att.content)} chars) ...\n"
+                else:
+                    files_context += "(No content available)"
+            
+            logger.info(f"✅ Loaded {len(attachments)} files for AI context")
             return files_context
             
         except Exception as e:
@@ -733,7 +756,7 @@ class DebuggingHandler(BaseTaskHandler):
         self.task_type = TaskType.DEBUGGING
     
     async def _get_error_context(self, session: Session, conversation_id: int) -> str:
-        """Get error context from project"""
+        """Get error context from project - reads LATEST files, falls back to ORIGINAL"""
         try:
             # Get recent chats
             recent_chats = session.exec(
@@ -748,12 +771,19 @@ class DebuggingHandler(BaseTaskHandler):
                 context += f"User: {chat.user}\n"
                 context += f"AI: {chat.ai_response}\n\n"
             
-            # Get project files
+            # Get project files - try LATEST first, fall back to ORIGINAL
             attachments = session.exec(
                 select(models.Attachment)
                 .where(models.Attachment.conversation_id == conversation_id)
                 .where(models.Attachment.status == models.FileStatus.LATEST)
             ).all()
+            
+            if not attachments:
+                attachments = session.exec(
+                    select(models.Attachment)
+                    .where(models.Attachment.conversation_id == conversation_id)
+                    .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+                ).all()
             
             context += "\nPROJECT FILES:\n"
             for att in attachments:
@@ -820,13 +850,21 @@ class DocumentationHandler(BaseTaskHandler):
         self.task_type = TaskType.DOCUMENTATION
     
     async def _get_code_samples(self, session: Session, conversation_id: int) -> str:
-        """Get code samples for documentation"""
+        """Get code samples for documentation - reads LATEST files, falls back to ORIGINAL"""
         try:
+            # Try LATEST first, fall back to ORIGINAL
             attachments = session.exec(
                 select(models.Attachment)
                 .where(models.Attachment.conversation_id == conversation_id)
                 .where(models.Attachment.status == models.FileStatus.LATEST)
             ).all()
+            
+            if not attachments:
+                attachments = session.exec(
+                    select(models.Attachment)
+                    .where(models.Attachment.conversation_id == conversation_id)
+                    .where(models.Attachment.status == models.FileStatus.ORIGINAL)
+                ).all()
             
             samples = "CODE SAMPLES:\n"
             for att in attachments[:3]:  # First 3 files

@@ -6,7 +6,13 @@ This project is a full-stack AI coding assistant built with FastAPI and React, p
 
 ## Recent Changes
 
-**Date: October 2, 2025 (Latest - Fresh GitHub Import Setup)**
+**Date: October 2, 2025 (Latest - Critical Bug Fix)**
+- **CRITICAL FIX: AI can now read user's files from GitHub import**
+  - Fixed all handlers in `app/services/cerebras_chain.py` to read ORIGINAL files when no LATEST exist
+  - Modified `_get_project_files()`, `_get_error_context()`, and `_get_code_samples()` methods
+  - Each handler now attempts to read LATEST files first, then falls back to ORIGINAL status files
+  - This fixes the critical issue where AI couldn't see any file content after GitHub import
+  - User's attached files are now properly included in AI context for analysis
 - **Fresh Replit Environment Setup from GitHub Clone**: Successfully configured project from GitHub import
   - Created PostgreSQL database using Replit's built-in database tool
   - Installed all Python dependencies via packager tool (FastAPI, SQLModel, Cerebras, OpenAI, PyGithub, etc.)
