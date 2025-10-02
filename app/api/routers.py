@@ -52,8 +52,8 @@ class ConversationCreate(BaseModel):
     first_message: Optional[str] = None
 
 class ConversationNameRequest(BaseModel):
-    conversation_id: int
-    message: Optional[str] = None  # Optional if we want to use existing messages
+    conversation_id: Optional[int] = None  # Optional for backward compatibility
+    message: Optional[str] = None
 
 @router.post("/conversation", response_model=models.Conversation)
 def new_conversation(
@@ -76,34 +76,42 @@ async def generate_conversation_name(
     request: ConversationNameRequest,
     session: Session = Depends(get_session)
 ):
-    """Generate conversation name using AI based on conversation messages"""
+    """Generate conversation name using AI based on message or conversation messages"""
     try:
         from app.services.cerebras_chain import generate_conversation_title
         
-        # Get conversation
-        conv = session.get(models.Conversation, request.conversation_id)
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        
-        # Get chats for this conversation
-        chats = session.exec(
-            select(models.Chat)
-            .where(models.Chat.conversation_id == request.conversation_id)
-            .order_by(models.Chat.created_at.asc())
-        ).all()
-        
         # Build messages list
         messages = []
+        conversation_id = 0  # Default for simple title generation
         
-        # If message provided in request, use it as first message
-        if request.message:
+        # Case 1: conversation_id provided - use existing messages from DB
+        if request.conversation_id:
+            conv = session.get(models.Conversation, request.conversation_id)
+            if not conv:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            
+            conversation_id = request.conversation_id
+            
+            # Get chats for this conversation
+            chats = session.exec(
+                select(models.Chat)
+                .where(models.Chat.conversation_id == request.conversation_id)
+                .order_by(models.Chat.created_at.asc())
+            ).all()
+            
+            # If message provided in request, add it first
+            if request.message:
+                messages.append({"role": "user", "content": request.message})
+            
+            # Add existing chats
+            for chat in chats:
+                messages.append({"role": "user", "content": chat.user})
+                if chat.ai_response:
+                    messages.append({"role": "assistant", "content": chat.ai_response})
+        
+        # Case 2: Only message provided - simple title generation (legacy)
+        elif request.message:
             messages.append({"role": "user", "content": request.message})
-        
-        # Add existing chats
-        for chat in chats:
-            messages.append({"role": "user", "content": chat.user})
-            if chat.ai_response:
-                messages.append({"role": "assistant", "content": chat.ai_response})
         
         # Need at least one message to generate title
         if not messages:
@@ -113,16 +121,19 @@ async def generate_conversation_name(
                 "error": "No messages available to generate title"
             }
         
-        # ✅ FIXED: Pass both required arguments
-        title = await generate_conversation_title(messages, request.conversation_id)
+        # ✅ Generate title with both arguments
+        title = await generate_conversation_title(messages, conversation_id)
         
-        # Update conversation title
-        conv.title = title
-        conv.updated_at = datetime.utcnow()
-        session.add(conv)
-        session.commit()
-        
-        logger.info(f"Generated title for conversation {request.conversation_id}: {title}")
+        # Update conversation title if conversation_id was provided
+        if request.conversation_id:
+            conv.title = title
+            conv.updated_at = datetime.utcnow()
+            session.add(conv)
+            session.commit()
+            
+            logger.info(f"Generated and saved title for conversation {request.conversation_id}: {title}")
+        else:
+            logger.info(f"Generated title (not saved): {title}")
         
         return {
             "success": True,
