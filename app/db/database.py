@@ -5,13 +5,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Single engine pointing to DATABASE_URL
+# Single engine pointing to DATABASE_URL with optimized pooling
 engine = create_engine(
     settings.DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
+    pool_recycle=settings.DB_POOL_RECYCLE,
 )
 
 def get_session():
@@ -47,144 +49,107 @@ def fix_conversation_table_columns():
     """Add missing columns and remove old columns from conversation table"""
     try:
         with Session(engine) as session:
-            # Check if columns exist
+            # Efficient single query to check required columns
             result = session.exec(text("""
                 SELECT column_name 
                 FROM information_schema.columns 
-                WHERE table_name = 'conversation'
+                WHERE table_name = 'conversation' 
+                AND column_name IN ('project_id', 'updated_at')
             """))
             
-            existing_columns = [row[0] for row in result]
+            existing_columns = {row[0] for row in result}
             
-            # Remove project_id column if it exists (old schema)
+            # Only run migrations if needed
+            needs_migration = False
+            
             if 'project_id' in existing_columns:
-                logger.info("Removing project_id column from conversation table (old schema)...")
-                session.exec(text("""
-                    ALTER TABLE conversation 
-                    DROP COLUMN IF EXISTS project_id CASCADE
-                """))
-                session.commit()
-                logger.info("✅ Removed project_id column")
+                logger.info("Removing project_id column from conversation table...")
+                session.exec(text("ALTER TABLE conversation DROP COLUMN project_id CASCADE"))
+                needs_migration = True
             
-            # Add updated_at if missing
             if 'updated_at' not in existing_columns:
                 logger.info("Adding updated_at column to conversation table...")
-                session.exec(text("""
-                    ALTER TABLE conversation 
-                    ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                """))
-                session.commit()
-                logger.info("✅ Added updated_at column")
+                session.exec(text("ALTER TABLE conversation ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+                needs_migration = True
             
-            logger.info("✅ Conversation table columns verified/fixed")
+            if needs_migration:
+                session.commit()
+                logger.info("✅ Conversation table migrated")
             
     except Exception as e:
-        logger.warning(f"⚠️ Could not auto-fix conversation table columns: {e}")
-        # Don't raise - let the app continue, migrations might handle it
+        logger.warning(f"⚠️ Could not auto-fix conversation table: {e}")
 
 def fix_attachment_table_columns():
     """Add missing columns to attachment table if they don't exist"""
     try:
         with Session(engine) as session:
-            # Check if columns exist
+            # Quick check for file_path column only
             result = session.exec(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'attachment'
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'attachment' AND column_name = 'file_path'
             """))
             
-            existing_columns = [row[0] for row in result]
-            
-            # Add file_path if missing
-            if 'file_path' not in existing_columns:
+            if not result.first():
                 logger.info("Adding file_path column to attachment table...")
-                session.exec(text("""
-                    ALTER TABLE attachment 
-                    ADD COLUMN file_path VARCHAR DEFAULT ''
-                """))
+                session.exec(text("ALTER TABLE attachment ADD COLUMN file_path VARCHAR DEFAULT ''"))
                 session.commit()
-                logger.info("✅ Added file_path column")
-            
-            logger.info("✅ Attachment table columns verified/fixed")
+                logger.info("✅ Attachment table migrated")
             
     except Exception as e:
-        logger.warning(f"⚠️ Could not auto-fix attachment table columns: {e}")
-        # Don't raise - let the app continue, migrations might handle it
+        logger.warning(f"⚠️ Could not auto-fix attachment table: {e}")
 
 def fix_chat_table_columns():
     """Add missing columns to chat table if they don't exist"""
     try:
         with Session(engine) as session:
-            # Check if columns exist
+            # Batch check for required columns
             result = session.exec(text("""
                 SELECT column_name 
                 FROM information_schema.columns 
-                WHERE table_name = 'chat'
+                WHERE table_name = 'chat' 
+                AND column_name IN ('response_received_at', 'context_file_ids', 'files_modified')
             """))
             
-            existing_columns = [row[0] for row in result]
+            existing_columns = {row[0] for row in result}
+            needs_migration = False
             
-            # Add response_received_at if missing
             if 'response_received_at' not in existing_columns:
-                logger.info("Adding response_received_at column to chat table...")
-                session.exec(text("""
-                    ALTER TABLE chat 
-                    ADD COLUMN response_received_at TIMESTAMP NULL
-                """))
-                session.commit()
-                logger.info("✅ Added response_received_at column")
+                logger.info("Adding response_received_at column...")
+                session.exec(text("ALTER TABLE chat ADD COLUMN response_received_at TIMESTAMP NULL"))
+                needs_migration = True
             
-            # Add context_file_ids if missing
             if 'context_file_ids' not in existing_columns:
-                logger.info("Adding context_file_ids column to chat table...")
-                session.exec(text("""
-                    ALTER TABLE chat 
-                    ADD COLUMN context_file_ids VARCHAR NULL
-                """))
-                session.commit()
-                logger.info("✅ Added context_file_ids column")
+                logger.info("Adding context_file_ids column...")
+                session.exec(text("ALTER TABLE chat ADD COLUMN context_file_ids VARCHAR NULL"))
+                needs_migration = True
             
-            # Add files_modified if missing
             if 'files_modified' not in existing_columns:
-                logger.info("Adding files_modified column to chat table...")
-                session.exec(text("""
-                    ALTER TABLE chat 
-                    ADD COLUMN files_modified VARCHAR NULL
-                """))
-                session.commit()
-                logger.info("✅ Added files_modified column")
+                logger.info("Adding files_modified column...")
+                session.exec(text("ALTER TABLE chat ADD COLUMN files_modified VARCHAR NULL"))
+                needs_migration = True
             
-            logger.info("✅ Chat table columns verified/fixed")
+            if needs_migration:
+                session.commit()
+                logger.info("✅ Chat table migrated")
             
     except Exception as e:
-        logger.warning(f"⚠️ Could not auto-fix chat table columns: {e}")
-        # Don't raise - let the app continue, migrations might handle it
+        logger.warning(f"⚠️ Could not auto-fix chat table: {e}")
 
 def fix_draftversion_table_columns():
     """Remove old columns from draftversion table"""
     try:
         with Session(engine) as session:
-            # Check if columns exist
+            # Quick check for project_id column
             result = session.exec(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'draftversion'
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'draftversion' AND column_name = 'project_id'
             """))
             
-            existing_columns = [row[0] for row in result]
-            
-            # Remove project_id column if it exists (old schema)
-            if 'project_id' in existing_columns:
-                logger.info("Removing project_id column from draftversion table (old schema)...")
-                session.exec(text("""
-                    ALTER TABLE draftversion 
-                    DROP COLUMN IF EXISTS project_id CASCADE
-                """))
+            if result.first():
+                logger.info("Removing project_id column from draftversion...")
+                session.exec(text("ALTER TABLE draftversion DROP COLUMN project_id CASCADE"))
                 session.commit()
-                logger.info("✅ Removed project_id column from draftversion")
-            
-            logger.info("✅ DraftVersion table columns verified/fixed")
+                logger.info("✅ DraftVersion table migrated")
             
     except Exception as e:
-        logger.warning(f"⚠️ Could not auto-fix draftversion table columns: {e}")
-        # Don't raise - let the app continue, migrations might handle it
+        logger.warning(f"⚠️ Could not auto-fix draftversion table: {e}")

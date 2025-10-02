@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     SECRET_KEY: str = ""
+    
+    # Database pool configuration
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 3600
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

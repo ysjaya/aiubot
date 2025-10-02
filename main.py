@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -52,9 +53,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add GZIP compression for responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Custom StaticFiles with caching headers
+from starlette.staticfiles import StaticFiles as StarletteStaticFiles
+from starlette.responses import Response
+
+class CachedStaticFiles(StarletteStaticFiles):
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        # Cache static assets for 1 year (immutable with hash in filename)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
 # Mount static files
 try:
-    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    app.mount("/static", CachedStaticFiles(directory="app/static"), name="static")
     logger.info("✅ Static files mounted")
 except Exception as e:
     logger.warning(f"⚠️ Could not mount static files: {e}")
@@ -63,7 +78,7 @@ except Exception as e:
 import os
 if os.path.exists("frontend/dist"):
     try:
-        app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+        app.mount("/assets", CachedStaticFiles(directory="frontend/dist/assets"), name="assets")
         logger.info("✅ Frontend assets mounted")
     except Exception as e:
         logger.warning(f"⚠️ Could not mount frontend assets: {e}")

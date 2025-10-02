@@ -201,9 +201,11 @@ def update_conversation(
 @router.get("/conversation/{conv_id}/chats", response_model=List[models.Chat])
 def get_chats(
     conv_id: int,
+    limit: int = 100,
+    offset: int = 0,
     session: Session = Depends(get_session)
 ):
-    """Mengambil semua chat dalam sebuah percakapan"""
+    """Mengambil chat dalam sebuah percakapan dengan pagination"""
     conv = session.get(models.Conversation, conv_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -212,6 +214,8 @@ def get_chats(
         select(models.Chat)
         .where(models.Chat.conversation_id == conv_id)
         .order_by(models.Chat.created_at.asc())
+        .limit(limit)
+        .offset(offset)
     ).all()
     return chats
 
