@@ -30,11 +30,11 @@ body {
   color: #e0e0e0;
   /* Mobile: prevent overscroll bounce */
   overscroll-behavior: none;
-  /* Mobile: fixed positioning for stable viewport */
-  position: fixed;
+  /* Allow natural resize when keyboard appears on mobile */
+  margin: 0;
   width: 100%;
-  height: 100vh;
-  height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
 }
 
 .app {
@@ -402,6 +402,10 @@ body {
   overflow-y: auto;
   padding: 20px;
   scroll-behavior: smooth;
+  /* Ensure smooth scrolling on mobile */
+  -webkit-overflow-scrolling: touch;
+  /* Allow content to be accessible when keyboard opens */
+  overscroll-behavior: contain;
 }
 
 .chat-bubble-container {
