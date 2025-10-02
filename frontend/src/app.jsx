@@ -822,17 +822,23 @@ function App() {
             <h2>Selamat Datang di AI Code Assistant</h2>
             <p>Buat percakapan baru untuk mulai chat dengan AI</p>
             <div className="features">
-              <div className="feature">
+              <div className="feature" onClick={createNewConversation} style={{ cursor: 'pointer' }}>
                 <span>💬</span>
                 <h3>AI Chat</h3>
                 <p>Percakapan otomatis dinamai berdasarkan topik</p>
               </div>
-              <div className="feature">
+              <div className="feature" onClick={() => {
+                createNewConversation();
+                setTimeout(() => setShowFileManager(true), 100);
+              }} style={{ cursor: 'pointer' }}>
                 <span>📝</span>
                 <h3>File Management</h3>
                 <p>Kelola dan versioning file dengan AI</p>
               </div>
-              <div className="feature">
+              <div className="feature" onClick={() => {
+                createNewConversation();
+                setTimeout(() => openGitHubImportModal(), 100);
+              }} style={{ cursor: 'pointer' }}>
                 <span>🚀</span>
                 <h3>GitHub Integration</h3>
                 <p>Import dan commit langsung ke repository</p>

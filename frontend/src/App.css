@@ -229,6 +229,8 @@ body {
   justify-content: center;
   padding: 40px;
   text-align: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .empty-state h2 {
@@ -255,12 +257,29 @@ body {
   padding: 30px;
   border-radius: 12px;
   border: 1px solid #2a2a2a;
+  transition: all 0.3s ease;
+}
+
+.feature:hover {
+  background: #2a2a2a;
+  border-color: #3a6db5;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(58, 109, 181, 0.2);
+}
+
+.feature:active {
+  transform: translateY(-2px);
 }
 
 .feature span {
   font-size: 48px;
   display: block;
   margin-bottom: 15px;
+  transition: transform 0.3s ease;
+}
+
+.feature:hover span {
+  transform: scale(1.1);
 }
 
 .feature h3 {
