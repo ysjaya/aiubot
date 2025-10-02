@@ -1268,6 +1268,70 @@ async def ai_chain_simple(
         logger.error(f"Critical error in ai_chain_simple: {e}")
         return f"Maaf, sistem mengalami kesalahan internal: {str(e)}"
 
+async def promote_draft_to_attachment(
+    draft_id: int,
+    conversation_id: int,
+    session: Session
+) -> Optional[models.Attachment]:
+    """
+    Promote a draft file to an attachment
+    
+    Args:
+        draft_id: ID of the draft to promote
+        conversation_id: ID of the conversation
+        session: Database session
+        
+    Returns:
+        The created attachment or None if failed
+    """
+    try:
+        # Get the draft
+        draft = session.get(models.Draft, draft_id)
+        if not draft or draft.conversation_id != conversation_id:
+            logger.error(f"Draft {draft_id} not found or doesn't belong to conversation {conversation_id}")
+            return None
+        
+        # Check if attachment with same filename already exists
+        existing = session.exec(
+            select(models.Attachment)
+            .where(models.Attachment.conversation_id == conversation_id)
+            .where(models.Attachment.filename == draft.filename)
+            .where(models.Attachment.status == models.FileStatus.LATEST)
+        ).first()
+        
+        if existing:
+            # Archive the old version
+            existing.status = models.FileStatus.ARCHIVED
+            session.add(existing)
+        
+        # Create new attachment from draft
+        attachment = models.Attachment(
+            conversation_id=conversation_id,
+            filename=draft.filename,
+            filepath=draft.filepath,
+            content=draft.content,
+            file_type=draft.file_type,
+            file_size=draft.file_size,
+            status=models.FileStatus.LATEST
+        )
+        
+        session.add(attachment)
+        
+        # Delete the draft
+        session.delete(draft)
+        
+        # Commit changes
+        session.commit()
+        session.refresh(attachment)
+        
+        logger.info(f"✅ Promoted draft {draft_id} to attachment {attachment.id}")
+        return attachment
+        
+    except Exception as e:
+        logger.error(f"Error promoting draft to attachment: {e}")
+        session.rollback()
+        return None
+
 # ==================== TASK MANAGEMENT ====================
 
 class TaskManager:
