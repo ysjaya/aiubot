@@ -52,7 +52,8 @@ class ConversationCreate(BaseModel):
     first_message: Optional[str] = None
 
 class ConversationNameRequest(BaseModel):
-    message: str
+    conversation_id: int
+    message: Optional[str] = None  # Optional if we want to use existing messages
 
 @router.post("/conversation", response_model=models.Conversation)
 def new_conversation(
@@ -75,17 +76,60 @@ async def generate_conversation_name(
     request: ConversationNameRequest,
     session: Session = Depends(get_session)
 ):
-    """Generate conversation name using AI based on first message"""
+    """Generate conversation name using AI based on conversation messages"""
     try:
         from app.services.cerebras_chain import generate_conversation_title
         
-        # Generate title using AI
-        title = await generate_conversation_title(request.message)
+        # Get conversation
+        conv = session.get(models.Conversation, request.conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Get chats for this conversation
+        chats = session.exec(
+            select(models.Chat)
+            .where(models.Chat.conversation_id == request.conversation_id)
+            .order_by(models.Chat.created_at.asc())
+        ).all()
+        
+        # Build messages list
+        messages = []
+        
+        # If message provided in request, use it as first message
+        if request.message:
+            messages.append({"role": "user", "content": request.message})
+        
+        # Add existing chats
+        for chat in chats:
+            messages.append({"role": "user", "content": chat.user})
+            if chat.ai_response:
+                messages.append({"role": "assistant", "content": chat.ai_response})
+        
+        # Need at least one message to generate title
+        if not messages:
+            return {
+                "success": False,
+                "title": "New Conversation",
+                "error": "No messages available to generate title"
+            }
+        
+        # ✅ FIXED: Pass both required arguments
+        title = await generate_conversation_title(messages, request.conversation_id)
+        
+        # Update conversation title
+        conv.title = title
+        conv.updated_at = datetime.utcnow()
+        session.add(conv)
+        session.commit()
+        
+        logger.info(f"Generated title for conversation {request.conversation_id}: {title}")
         
         return {
             "success": True,
             "title": title
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to generate conversation title: {e}")
         # Fallback to default title
