@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     NVIDIA_API_KEY: str = ""
     GITHUB_TOKEN: str = ""
     
+    # API keys untuk web search
+    SERPAPI_API_KEY: str = ""
+    BING_API_KEY: str = ""
+    
     # OAuth fields are optional since we now use Replit connector
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
@@ -25,3 +29,18 @@ if not settings.SECRET_KEY:
         print("⚠️ WARNING: Using auto-generated SECRET_KEY for development. Set SECRET_KEY in production!")
     else:  # Production
         raise ValueError("SECRET_KEY must be set in production environment")
+
+# Logging
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Cek ketersediaan API keys
+if not settings.CEREBRAS_API_KEY:
+    logger.warning("⚠️ CEREBRAS_API_KEY not configured - Cerebras integration will be limited")
+if not settings.NVIDIA_API_KEY:
+    logger.warning("⚠️ NVIDIA_API_KEY not configured - NVIDIA integration will be limited")
+if not settings.SERPAPI_API_KEY:
+    logger.debug("🔍 SERPAPI_API_KEY not configured - enhanced web search will be limited")
+if not settings.BING_API_KEY:
+    logger.debug("🔍 BING_API_KEY not configured - Bing search will be limited")
