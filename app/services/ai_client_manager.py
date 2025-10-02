@@ -1,3 +1,4 @@
+"""
 # app/services/ai_client_manager.py
 # New modular AIClientManager that uses model_registry for capability-aware model selection
 
@@ -101,10 +102,8 @@ class AIClientManager:
         return None
 
     async def call_best_available(self, messages: List[Dict], model_hint: str = "", max_tokens: int = 4096, temperature: float = 0.7, stream: bool = False) -> Optional[Dict]:
-        """
-        Choose the best available model according to the registry and try with failover.
-        model_hint can be a family hint ('cerebras') or specific model id.
-        """
+        """Choose the best available model according to the registry and try with failover.
+        model_hint can be a family hint ('cerebras') or specific model id."""
         # If hint is a family name (e.g., 'cerebras'), try to choose a model from that family
         preferred_family = ""
         hints = []
@@ -137,3 +136,26 @@ class AIClientManager:
 
         logger.error("❌ All AI clients/models failed in call_best_available")
         return None
+
+    async def call_models_sequential(self, messages: List[Dict], model_ids: List[str],
+                                     max_tokens: int = 4096, temperature: float = 0.7, stream: bool = False) -> List[Dict]:
+        """Call given model_ids in order, return list of responses (dict per model).
+        Each response is normalized (content, model, usage) or {'error': ...} on failure."""
+        results = []
+        for model_id in model_ids:
+            cap = get_model_capability(model_id)
+            per_max = min(max_tokens, cap.get("max_tokens", max_tokens))
+            try:
+                resp = await self.call_model(messages, model_id, max_tokens=per_max, temperature=temperature, stream=stream)
+                if resp:
+                    results.append({"model": model_id, "response": resp})
+                    # append assistant content for subsequent calls
+                    assistant_content = resp.get("content", "")
+                    if assistant_content:
+                        messages.append({"role": "assistant", "content": assistant_content})
+                else:
+                    results.append({"model": model_id, "response": None, "error": "no_response"})
+            except Exception as e:
+                results.append({"model": model_id, "response": None, "error": str(e)})
+        return results
+"""
